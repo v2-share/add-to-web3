@@ -24,6 +24,12 @@ with:
 
 **Required** The path the root directory of your static website or other content that you want to publish to IPFS.
 
+### `file_name`
+
+**Required** file name that you want to publish to IPFS.
+
+
+
 ### `web3_token`
 
 **Required** API token for web3.storage
