@@ -9,7 +9,7 @@ inputs:
     description: 'Directory path to add to IPFS'
     required: true
   file_name:
-    description: 'Directory path to add to IPFS'
+    description: 'Filename path to add to IPFS'
     required: true
   web3_token:
     description: 'API token for web3.storage'
