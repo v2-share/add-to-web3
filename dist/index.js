@@ -28888,8 +28888,11 @@ const { addToWeb3, pickName } = __nccwpck_require__(7649)
 
 async function run () {
   try {
+   const filename = core.getInput('file_name')
+    
+	  
     const name = pickName({
-      repo: process.env.GITHUB_REPOSITORY,
+      repo: filename,
       run: process.env.GITHUB_RUN_NUMBER,
       sha: process.env.GITHUB_SHA
     })
