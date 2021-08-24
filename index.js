@@ -8,6 +8,7 @@ async function run () {
       run: process.env.GITHUB_RUN_NUMBER,
       sha: process.env.GITHUB_SHA
     })
+    
     const endpoint = new URL(core.getInput('web3_api'))
     const pathToAdd = core.getInput('path_to_add')
     const token = core.getInput('web3_token')
