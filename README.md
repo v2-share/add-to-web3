@@ -9,7 +9,7 @@ id: web3
 with:
   web3_token: ${{ secrets.WEB3_STORAGE_TOKEN }}
   path_to_add: 'dist'
-  file_name:'test'
+  file_name:  'test'
 
 # "bafkreicysg23kiwv34eg2d7qweipxwosdo2py4ldv42nbauguluen5v6am"
 - run: echo ${{ steps.web3.outputs.cid }}
