@@ -1,4 +1,4 @@
-<h1 align="center">使用本工具需要在Actions secrets添加两个secrets<br>1、WEB3_STORAGE_TOKEN 2、DB_CONNECT数据库的远程链接字符串用的是mongodb.可以用官方免费的500m数据库</h1>
+<h1 align="center">使用本工具需要在Actions secrets添加两个secrets<br>1、WEB3_STORAGE_TOKEN这个是从web3.storage获得的 <br>2、DB_CONNECT数据库的远程链接字符串用的是mongodb.可以用官方免费的500m数据库</h1>
 
 <h1 align="center">⁂<br/>web3.storage</h1>
 <p align="center">Add a directory to web3.storage from an Action, and output it's IPFS Content ID.</p>
