@@ -1,4 +1,4 @@
-name: Downloader by Aria2
+name: Downloader NFT.storage
 
 on:
   repository_dispatch:
