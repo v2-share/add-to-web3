@@ -1,4 +1,4 @@
-name: Downloader by Aria2
+name: Download file from url
 
 on:
   repository_dispatch:
