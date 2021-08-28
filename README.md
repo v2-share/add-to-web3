@@ -4,7 +4,7 @@
 <h1>演示视频: <br><a href="https://youtu.be/A7pImBMentI" targe="_blank">https://youtu.be/A7pImBMentI</a> <br><a href="https://youtu.be/fqHjkzwPw_o" targe="_blank">https://youtu.be/fqHjkzwPw_o</a>
 </h1>
 
-<p align="left">加入任务模式：不需要修改url内容，需要在mongodb内建立task表,插入url字段数据即可。每次查询一条url然后下载，查询后不管下载成功与否随即删除。</p>
+<p align="left">加入任务模式：不需要修改url内容，需要在mongodb内建立task表,插入url字段数据即可。每次查询一条url然后下载，查询后不管下载成功与否随即删除。对应actions为Download task.目前为手动触发。根据自己情况修改actions的触发为schedule即可。</p>
 
 <h1 align="center">⁂<br/>web3.storage</h1>
 <p align="center">Add a directory to web3.storage from an Action, and output it's IPFS Content ID.</p>
