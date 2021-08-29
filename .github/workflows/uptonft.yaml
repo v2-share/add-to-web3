@@ -1,4 +1,4 @@
-name: 1Download task
+name: 2Upload to nft.storage
 
 on:
   repository_dispatch:
