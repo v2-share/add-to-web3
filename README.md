@@ -3,6 +3,9 @@
 <h2 align="left">1、WEB3_STORAGE_TOKEN这个是从web3.storage获得的 <br>2、DB_CONNECT(可选)数据库的远程链接字符串用的是mongodb.可以用官方免费的500m数据库，只使用Actions上传的话不需要</h2>
 <h1>演示视频: <br><a href="https://youtu.be/A7pImBMentI" targe="_blank">https://youtu.be/A7pImBMentI</a> <br><a href="https://youtu.be/fqHjkzwPw_o" targe="_blank">https://youtu.be/fqHjkzwPw_o</a>
 </h1>
+<p>已经完全采用mongodb数据库的方法来处理下载地址的获取，请忽略视频中的url修改。<br/>
+数据库中建立task表添加url和isnow字段.立即下载isnow="1",日常任务isnow="0"
+</p>
 
 <p align="left">加入任务模式：不需要修改url内容，需要在mongodb内建立task表,插入url字段数据即可。每次查询一条url然后下载，查询后不管下载成功与否随即删除。对应actions为Download task.目前为手动触发。根据自己情况修改actions的触发为schedule即可。</p>
 
