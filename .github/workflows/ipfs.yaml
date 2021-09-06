@@ -2,6 +2,8 @@ name: 3Upload file to ipfs
 
 on:
   repository_dispatch:
+#  schedule:
+#     - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       Url:
