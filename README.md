@@ -8,7 +8,7 @@
 </p>
 
 
-<p align="left">加入下载完成通知功能：利用免费的mqtt服务器:broker-cn.emqx.io实现下载完成后发送完成信息。需要在secrets里添加SYNC_TOPIC做为唯一订阅主题即可。本地随意处理。</p>
+<p align="left">加入下载完成通知功能：利用免费的mqtt服务器:broker-cn.emqx.io实现下载完成后发送完成信息。需要在secrets里添加SYNC_TOPIC做为唯一订阅主题即可。如使用Docker管理发送内容必需为ok,本地随意处理。</p>
 
 
 <p align="left">加入任务模式：不需要修改url内容，需要在mongodb内建立task表,插入url字段数据即可。每次查询一条url然后下载，查询后不管下载成功与否随即删除。对应actions为Download task.目前为手动触发。根据自己情况修改actions的触发为schedule即可。</p>
