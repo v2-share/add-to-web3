@@ -1,6 +1,6 @@
 
-<h1 align="left">使用本工具需要在Actions secrets添加两个secrets</h1>
-<h2 align="left">1、WEB3_STORAGE_TOKEN这个是从web3.storage获得的 <br>2、DB_CONNECT(可选)数据库的远程链接字符串用的是mongodb.可以用官方免费的500m数据库，只使用Actions上传的话不需要</h2>
+<h1 align="left">使用本工具需要在Actions secrets添加3个secrets</h1>
+<h2 align="left">1、WEB3_STORAGE_TOKEN这个是从web3.storage获得的 <br>2、DB_CONNECT(可选)数据库的远程链接字符串用的是mongodb.可以用官方免费的500m数据库，只使用Actions上传的话不需要<br/>3.SYNC_TOPIC (可选)下载完成功mqtt通知主题。客户端订阅该主题即可接收下载完成提示。</h2>
 <h1>演示视频: <br><a href="https://youtu.be/A7pImBMentI" targe="_blank">https://youtu.be/A7pImBMentI</a> <br><a href="https://youtu.be/fqHjkzwPw_o" targe="_blank">https://youtu.be/fqHjkzwPw_o</a>
 </h1>
 <p>已经完全采用mongodb数据库的方法来处理下载地址的获取，请忽略视频中的url修改。<br/>
