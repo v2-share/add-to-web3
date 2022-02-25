@@ -24853,9 +24853,9 @@ function extend() {
 const { getFilesFromPath } = __nccwpck_require__(5090)
 const { Web3Storage } = __nccwpck_require__(8100)
 
-async function addToWeb3 ({ endpoint, token, pathToAdd, name, wrapWithDirectory = false }) {
+async function addToWeb3 ({ endpoint, token, pathToAdd, name, wrapWithDirectory = false, includeHidden }) {
   const web3 = new Web3Storage({ endpoint, token })
-  const files = await getFilesFromPath(pathToAdd)
+  const files = await getFilesFromPath(pathToAdd, { hidden: includeHidden })
   const cid = await web3.put(files, { name, wrapWithDirectory })
   const url = `https://dweb.link/ipfs/${cid}`
   return { cid, url }
@@ -24867,7 +24867,6 @@ function pickName ({ repo, run, sha }) {
 
 module.exports.addToWeb3 = addToWeb3
 module.exports.pickName = pickName
-
 
 /***/ }),
 
@@ -28479,9 +28478,10 @@ async function run () {
     const endpoint = new URL(core.getInput('web3_api'))
     const pathToAdd = core.getInput('path_to_add')
     const token = core.getInput('web3_token')
+    const includeHidden = core.getInput('include_hidden')
     const wrapWithDirectory = core.getBooleanInput('wrap_with_directory')
     core.info(`Adding ${pathToAdd} to ${endpoint.origin}`)
-    const { cid, url } = await addToWeb3({ endpoint, token, name, pathToAdd, wrapWithDirectory })
+    const { cid, url } = await addToWeb3({ endpoint, token, name, pathToAdd, wrapWithDirectory, includeHidden })
     core.info(url)
     core.setOutput('cid', cid)
     core.setOutput('url', url)
