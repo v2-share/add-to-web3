@@ -10,7 +10,7 @@ async function addToWeb3 ({ endpoint, token, pathToAdd, name, wrapWithDirectory 
 }
 
 function pickName ({ repo, run, sha }) {
-  return `${repo.replace('/', '-')}-${run}-${sha.substring(0, 8)}`
+  return `${repo.replace('/', '-')}`
 }
 
 module.exports.addToWeb3 = addToWeb3
