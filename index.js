@@ -10,7 +10,7 @@ async function run () {
     //   sha: process.env.GITHUB_SHA
     // })
     const name = pickName({
-      repo: encodeURIComponent(filename)
+      repo: filename
     })
     
     const endpoint = new URL(core.getInput('web3_api'))
