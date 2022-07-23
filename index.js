@@ -4,10 +4,13 @@ const { addToWeb3, pickName } = require('./web3')
 async function run () {
   try {
     const filename = core.getInput('file_name')
+    // const name = pickName({
+    //   repo: encodeURIComponent(filename),
+    //   run: process.env.GITHUB_RUN_NUMBER,
+    //   sha: process.env.GITHUB_SHA
+    // })
     const name = pickName({
-      repo: encodeURIComponent(filename),
-      run: process.env.GITHUB_RUN_NUMBER,
-      sha: process.env.GITHUB_SHA
+      repo: encodeURIComponent(filename)
     })
     
     const endpoint = new URL(core.getInput('web3_api'))

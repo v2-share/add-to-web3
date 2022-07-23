@@ -9,7 +9,7 @@ async function addToWeb3 ({ endpoint, token, pathToAdd, name, wrapWithDirectory 
   return { cid, url }
 }
 
-function pickName ({ repo, run, sha }) {
+function pickName ({ repo}) {
   return `${repo.replace('/', '-')}`
 }
 
