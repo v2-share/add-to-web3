@@ -12,7 +12,7 @@ async function run () {
     const name = pickName({
       repo: filename
     })
-    
+
     const endpoint = new URL(core.getInput('web3_api'))
     const pathToAdd = core.getInput('path_to_add')
     const token = core.getInput('web3_token')
