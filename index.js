@@ -5,7 +5,7 @@ async function run () {
   try {
     const filename = core.getInput('file_name')
     const name = pickName({
-      repo: filename,
+      repo: encodeURIComponent(filename),
       run: process.env.GITHUB_RUN_NUMBER,
       sha: process.env.GITHUB_SHA
     })
