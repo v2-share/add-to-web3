@@ -6240,29 +6240,33 @@ var _0uint = __nccwpck_require__(3256);
 var _2bytes = __nccwpck_require__(9550);
 var byteUtils = __nccwpck_require__(2543);
 
-function toToken(data, pos, prefix, length) {
+function toToken(data, pos, prefix, length, options) {
   const totLength = prefix + length;
   common.assertEnoughData(data, pos, totLength);
-  return new token.Token(token.Type.string, byteUtils.toString(data, pos + prefix, pos + totLength), totLength);
+  const tok = new token.Token(token.Type.string, byteUtils.toString(data, pos + prefix, pos + totLength), totLength);
+  if (options.retainStringBytes === true) {
+    tok.byteValue = byteUtils.slice(data, pos + prefix, pos + totLength);
+  }
+  return tok;
 }
-function decodeStringCompact(data, pos, minor, _options) {
-  return toToken(data, pos, 1, minor);
+function decodeStringCompact(data, pos, minor, options) {
+  return toToken(data, pos, 1, minor, options);
 }
 function decodeString8(data, pos, _minor, options) {
-  return toToken(data, pos, 2, _0uint.readUint8(data, pos + 1, options));
+  return toToken(data, pos, 2, _0uint.readUint8(data, pos + 1, options), options);
 }
 function decodeString16(data, pos, _minor, options) {
-  return toToken(data, pos, 3, _0uint.readUint16(data, pos + 1, options));
+  return toToken(data, pos, 3, _0uint.readUint16(data, pos + 1, options), options);
 }
 function decodeString32(data, pos, _minor, options) {
-  return toToken(data, pos, 5, _0uint.readUint32(data, pos + 1, options));
+  return toToken(data, pos, 5, _0uint.readUint32(data, pos + 1, options), options);
 }
 function decodeString64(data, pos, _minor, options) {
   const l = _0uint.readUint64(data, pos + 1, options);
   if (typeof l === 'bigint') {
     throw new Error(`${ common.decodeErrPrefix } 64-bit integer string lengths not supported`);
   }
-  return toToken(data, pos, 9, l);
+  return toToken(data, pos, 9, l, options);
 }
 const encodeString = _2bytes.encodeBytes;
 
@@ -6320,6 +6324,9 @@ function encodeArray(buf, token$1) {
   _0uint.encodeUintValue(buf, token.Type.array.majorEncoded, token$1.value);
 }
 encodeArray.compareTokens = _0uint.encodeUint.compareTokens;
+encodeArray.encodedSize = function encodedSize(token) {
+  return _0uint.encodeUintValue.encodedSize(token.value);
+};
 
 exports.decodeArray16 = decodeArray16;
 exports.decodeArray32 = decodeArray32;
@@ -6376,6 +6383,9 @@ function encodeMap(buf, token$1) {
   _0uint.encodeUintValue(buf, token.Type.map.majorEncoded, token$1.value);
 }
 encodeMap.compareTokens = _0uint.encodeUint.compareTokens;
+encodeMap.encodedSize = function encodedSize(token) {
+  return _0uint.encodeUintValue.encodedSize(token.value);
+};
 
 exports.decodeMap16 = decodeMap16;
 exports.decodeMap32 = decodeMap32;
@@ -6418,6 +6428,9 @@ function encodeTag(buf, token$1) {
   _0uint.encodeUintValue(buf, token.Type.tag.majorEncoded, token$1.value);
 }
 encodeTag.compareTokens = _0uint.encodeUint.compareTokens;
+encodeTag.encodedSize = function encodedSize(token) {
+  return _0uint.encodeUintValue.encodedSize(token.value);
+};
 
 exports.decodeTag16 = decodeTag16;
 exports.decodeTag32 = decodeTag32;
@@ -6522,10 +6535,9 @@ encodeFloat.encodedSize = function encodedSize(token, options) {
   if (float === false || float === true || float === null || float === undefined) {
     return 1;
   }
-  let decoded;
   if (!options || options.float64 !== true) {
     encodeFloat16(float);
-    decoded = readFloat16(ui8a, 1);
+    let decoded = readFloat16(ui8a, 1);
     if (float === decoded || Number.isNaN(float)) {
       return 3;
     }
@@ -6646,9 +6658,11 @@ class Bl {
     this._initReuseChunk = null;
   }
   reset() {
-    this.chunks = [];
     this.cursor = 0;
     this.maxCursor = -1;
+    if (this.chunks.length) {
+      this.chunks = [];
+    }
     if (this._initReuseChunk !== null) {
       this.chunks.push(this._initReuseChunk);
       this.maxCursor = this._initReuseChunk.length - 1;
@@ -7163,15 +7177,19 @@ const defaultEncodeOptions = {
   mapSorter,
   quickEncodeToken: jump.quickEncodeToken
 };
-const cborEncoders = [];
-cborEncoders[token.Type.uint.major] = _0uint.encodeUint;
-cborEncoders[token.Type.negint.major] = _1negint.encodeNegint;
-cborEncoders[token.Type.bytes.major] = _2bytes.encodeBytes;
-cborEncoders[token.Type.string.major] = _3string.encodeString;
-cborEncoders[token.Type.array.major] = _4array.encodeArray;
-cborEncoders[token.Type.map.major] = _5map.encodeMap;
-cborEncoders[token.Type.tag.major] = _6tag.encodeTag;
-cborEncoders[token.Type.float.major] = _7float.encodeFloat;
+function makeCborEncoders() {
+  const encoders = [];
+  encoders[token.Type.uint.major] = _0uint.encodeUint;
+  encoders[token.Type.negint.major] = _1negint.encodeNegint;
+  encoders[token.Type.bytes.major] = _2bytes.encodeBytes;
+  encoders[token.Type.string.major] = _3string.encodeString;
+  encoders[token.Type.array.major] = _4array.encodeArray;
+  encoders[token.Type.map.major] = _5map.encodeMap;
+  encoders[token.Type.tag.major] = _6tag.encodeTag;
+  encoders[token.Type.float.major] = _7float.encodeFloat;
+  return encoders;
+}
+const cborEncoders = makeCborEncoders();
 const buf = new bl.Bl();
 class Ref {
   constructor(obj, parent) {
@@ -7369,6 +7387,7 @@ function encodeCustom(data, encoders, options) {
       return byteUtils.asU8A(buf.chunks[0]);
     }
   }
+  buf.reset();
   tokensToEncoded(buf, tokens, encoders, options);
   return buf.toBytes(true);
 }
@@ -7380,6 +7399,7 @@ function encode(data, options) {
 exports.Ref = Ref;
 exports.encode = encode;
 exports.encodeCustom = encodeCustom;
+exports.makeCborEncoders = makeCborEncoders;
 exports.objectToTokens = objectToTokens;
 
 
@@ -7703,6 +7723,7 @@ class Token {
     this.value = value;
     this.encodedLength = encodedLength;
     this.encodedBytes = undefined;
+    this.byteValue = undefined;
   }
   toString() {
     return `Token[${ this.type }].${ this.value }`;
@@ -7882,35 +7903,19 @@ module.exports = createError;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 var Path = __nccwpck_require__(5622);
-var fs = __nccwpck_require__(5747);
+var fs = __nccwpck_require__(7758);
+var util = __nccwpck_require__(1669);
 var glob = __nccwpck_require__(402);
 var errCode = __nccwpck_require__(2997);
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
-function _interopNamespace(e) {
-  if (e && e.__esModule) return e;
-  var n = Object.create(null);
-  if (e) {
-    Object.keys(e).forEach(function (k) {
-      if (k !== 'default') {
-        var d = Object.getOwnPropertyDescriptor(e, k);
-        Object.defineProperty(n, k, d.get ? d : {
-          enumerable: true,
-          get: function () { return e[k]; }
-        });
-      }
-    });
-  }
-  n["default"] = e;
-  return Object.freeze(n);
-}
-
 var Path__default = /*#__PURE__*/_interopDefaultLegacy(Path);
-var fs__namespace = /*#__PURE__*/_interopNamespace(fs);
+var fs__default = /*#__PURE__*/_interopDefaultLegacy(fs);
 var glob__default = /*#__PURE__*/_interopDefaultLegacy(glob);
 var errCode__default = /*#__PURE__*/_interopDefaultLegacy(errCode);
 
+const fsStat = util.promisify(fs__default["default"].stat);
 async function getFilesFromPath(paths, options) {
   const files = [];
   for await (const file of filesFromPath(paths, options)) {
@@ -7936,8 +7941,8 @@ async function* filesFromPath(paths, options) {
       throw errCode__default["default"](new Error('Path must be a string'), 'ERR_INVALID_PATH', { path });
     }
     const absolutePath = Path__default["default"].resolve(process.cwd(), path);
-    const stat = await fs__namespace.promises.stat(absolutePath);
-    const prefix = Path__default["default"].dirname(absolutePath);
+    const stat = await fsStat(absolutePath);
+    const prefix = options.pathPrefix || Path__default["default"].dirname(absolutePath);
     let mode = options.mode;
     if (options.preserveMode) {
       mode = stat.mode;
@@ -7964,7 +7969,7 @@ async function* toGlobSource({path, type, prefix, mode, mtime, size, preserveMod
   if (type === 'file') {
     yield {
       name: `/${ baseName.replace(prefix, '') }`,
-      stream: () => fs__namespace.createReadStream(Path__default["default"].isAbsolute(path) ? path : Path__default["default"].join(process.cwd(), path)),
+      stream: () => fs__default["default"].createReadStream(Path__default["default"].isAbsolute(path) ? path : Path__default["default"].join(process.cwd(), path)),
       mode,
       mtime,
       size
@@ -7978,7 +7983,7 @@ async function* toGlobSource({path, type, prefix, mode, mtime, size, preserveMod
     absolute: true
   });
   for await (const p of glob__default["default"](path, '**/*', globOptions)) {
-    const stat = await fs__namespace.promises.stat(p);
+    const stat = await fsStat(p);
     if (!stat.isFile()) {
       continue;
     }
@@ -7992,7 +7997,7 @@ async function* toGlobSource({path, type, prefix, mode, mtime, size, preserveMod
     }
     yield {
       name: toPosix(p.replace(prefix, '')),
-      stream: () => fs__namespace.createReadStream(p),
+      stream: () => fs__default["default"].createReadStream(p),
       mode,
       mtime,
       size: stat.size
@@ -8003,6 +8008,979 @@ const toPosix = path => path.replace(/\\/g, '/');
 
 exports.filesFromPath = filesFromPath;
 exports.getFilesFromPath = getFilesFromPath;
+
+
+/***/ }),
+
+/***/ 7356:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = clone
+
+var getPrototypeOf = Object.getPrototypeOf || function (obj) {
+  return obj.__proto__
+}
+
+function clone (obj) {
+  if (obj === null || typeof obj !== 'object')
+    return obj
+
+  if (obj instanceof Object)
+    var copy = { __proto__: getPrototypeOf(obj) }
+  else
+    var copy = Object.create(null)
+
+  Object.getOwnPropertyNames(obj).forEach(function (key) {
+    Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(obj, key))
+  })
+
+  return copy
+}
+
+
+/***/ }),
+
+/***/ 7758:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var fs = __nccwpck_require__(5747)
+var polyfills = __nccwpck_require__(263)
+var legacy = __nccwpck_require__(3086)
+var clone = __nccwpck_require__(7356)
+
+var util = __nccwpck_require__(1669)
+
+/* istanbul ignore next - node 0.x polyfill */
+var gracefulQueue
+var previousSymbol
+
+/* istanbul ignore else - node 0.x polyfill */
+if (typeof Symbol === 'function' && typeof Symbol.for === 'function') {
+  gracefulQueue = Symbol.for('graceful-fs.queue')
+  // This is used in testing by future versions
+  previousSymbol = Symbol.for('graceful-fs.previous')
+} else {
+  gracefulQueue = '___graceful-fs.queue'
+  previousSymbol = '___graceful-fs.previous'
+}
+
+function noop () {}
+
+function publishQueue(context, queue) {
+  Object.defineProperty(context, gracefulQueue, {
+    get: function() {
+      return queue
+    }
+  })
+}
+
+var debug = noop
+if (util.debuglog)
+  debug = util.debuglog('gfs4')
+else if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || ''))
+  debug = function() {
+    var m = util.format.apply(util, arguments)
+    m = 'GFS4: ' + m.split(/\n/).join('\nGFS4: ')
+    console.error(m)
+  }
+
+// Once time initialization
+if (!fs[gracefulQueue]) {
+  // This queue can be shared by multiple loaded instances
+  var queue = global[gracefulQueue] || []
+  publishQueue(fs, queue)
+
+  // Patch fs.close/closeSync to shared queue version, because we need
+  // to retry() whenever a close happens *anywhere* in the program.
+  // This is essential when multiple graceful-fs instances are
+  // in play at the same time.
+  fs.close = (function (fs$close) {
+    function close (fd, cb) {
+      return fs$close.call(fs, fd, function (err) {
+        // This function uses the graceful-fs shared queue
+        if (!err) {
+          resetQueue()
+        }
+
+        if (typeof cb === 'function')
+          cb.apply(this, arguments)
+      })
+    }
+
+    Object.defineProperty(close, previousSymbol, {
+      value: fs$close
+    })
+    return close
+  })(fs.close)
+
+  fs.closeSync = (function (fs$closeSync) {
+    function closeSync (fd) {
+      // This function uses the graceful-fs shared queue
+      fs$closeSync.apply(fs, arguments)
+      resetQueue()
+    }
+
+    Object.defineProperty(closeSync, previousSymbol, {
+      value: fs$closeSync
+    })
+    return closeSync
+  })(fs.closeSync)
+
+  if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || '')) {
+    process.on('exit', function() {
+      debug(fs[gracefulQueue])
+      __nccwpck_require__(2357).equal(fs[gracefulQueue].length, 0)
+    })
+  }
+}
+
+if (!global[gracefulQueue]) {
+  publishQueue(global, fs[gracefulQueue]);
+}
+
+module.exports = patch(clone(fs))
+if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs.__patched) {
+    module.exports = patch(fs)
+    fs.__patched = true;
+}
+
+function patch (fs) {
+  // Everything that references the open() function needs to be in here
+  polyfills(fs)
+  fs.gracefulify = patch
+
+  fs.createReadStream = createReadStream
+  fs.createWriteStream = createWriteStream
+  var fs$readFile = fs.readFile
+  fs.readFile = readFile
+  function readFile (path, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$readFile(path, options, cb)
+
+    function go$readFile (path, options, cb, startTime) {
+      return fs$readFile(path, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$readFile, [path, options, cb], err, startTime || Date.now(), Date.now()])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+        }
+      })
+    }
+  }
+
+  var fs$writeFile = fs.writeFile
+  fs.writeFile = writeFile
+  function writeFile (path, data, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$writeFile(path, data, options, cb)
+
+    function go$writeFile (path, data, options, cb, startTime) {
+      return fs$writeFile(path, data, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$writeFile, [path, data, options, cb], err, startTime || Date.now(), Date.now()])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+        }
+      })
+    }
+  }
+
+  var fs$appendFile = fs.appendFile
+  if (fs$appendFile)
+    fs.appendFile = appendFile
+  function appendFile (path, data, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    return go$appendFile(path, data, options, cb)
+
+    function go$appendFile (path, data, options, cb, startTime) {
+      return fs$appendFile(path, data, options, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$appendFile, [path, data, options, cb], err, startTime || Date.now(), Date.now()])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+        }
+      })
+    }
+  }
+
+  var fs$copyFile = fs.copyFile
+  if (fs$copyFile)
+    fs.copyFile = copyFile
+  function copyFile (src, dest, flags, cb) {
+    if (typeof flags === 'function') {
+      cb = flags
+      flags = 0
+    }
+    return go$copyFile(src, dest, flags, cb)
+
+    function go$copyFile (src, dest, flags, cb, startTime) {
+      return fs$copyFile(src, dest, flags, function (err) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$copyFile, [src, dest, flags, cb], err, startTime || Date.now(), Date.now()])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+        }
+      })
+    }
+  }
+
+  var fs$readdir = fs.readdir
+  fs.readdir = readdir
+  var noReaddirOptionVersions = /^v[0-5]\./
+  function readdir (path, options, cb) {
+    if (typeof options === 'function')
+      cb = options, options = null
+
+    var go$readdir = noReaddirOptionVersions.test(process.version)
+      ? function go$readdir (path, options, cb, startTime) {
+        return fs$readdir(path, fs$readdirCallback(
+          path, options, cb, startTime
+        ))
+      }
+      : function go$readdir (path, options, cb, startTime) {
+        return fs$readdir(path, options, fs$readdirCallback(
+          path, options, cb, startTime
+        ))
+      }
+
+    return go$readdir(path, options, cb)
+
+    function fs$readdirCallback (path, options, cb, startTime) {
+      return function (err, files) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([
+            go$readdir,
+            [path, options, cb],
+            err,
+            startTime || Date.now(),
+            Date.now()
+          ])
+        else {
+          if (files && files.sort)
+            files.sort()
+
+          if (typeof cb === 'function')
+            cb.call(this, err, files)
+        }
+      }
+    }
+  }
+
+  if (process.version.substr(0, 4) === 'v0.8') {
+    var legStreams = legacy(fs)
+    ReadStream = legStreams.ReadStream
+    WriteStream = legStreams.WriteStream
+  }
+
+  var fs$ReadStream = fs.ReadStream
+  if (fs$ReadStream) {
+    ReadStream.prototype = Object.create(fs$ReadStream.prototype)
+    ReadStream.prototype.open = ReadStream$open
+  }
+
+  var fs$WriteStream = fs.WriteStream
+  if (fs$WriteStream) {
+    WriteStream.prototype = Object.create(fs$WriteStream.prototype)
+    WriteStream.prototype.open = WriteStream$open
+  }
+
+  Object.defineProperty(fs, 'ReadStream', {
+    get: function () {
+      return ReadStream
+    },
+    set: function (val) {
+      ReadStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+  Object.defineProperty(fs, 'WriteStream', {
+    get: function () {
+      return WriteStream
+    },
+    set: function (val) {
+      WriteStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+
+  // legacy names
+  var FileReadStream = ReadStream
+  Object.defineProperty(fs, 'FileReadStream', {
+    get: function () {
+      return FileReadStream
+    },
+    set: function (val) {
+      FileReadStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+  var FileWriteStream = WriteStream
+  Object.defineProperty(fs, 'FileWriteStream', {
+    get: function () {
+      return FileWriteStream
+    },
+    set: function (val) {
+      FileWriteStream = val
+    },
+    enumerable: true,
+    configurable: true
+  })
+
+  function ReadStream (path, options) {
+    if (this instanceof ReadStream)
+      return fs$ReadStream.apply(this, arguments), this
+    else
+      return ReadStream.apply(Object.create(ReadStream.prototype), arguments)
+  }
+
+  function ReadStream$open () {
+    var that = this
+    open(that.path, that.flags, that.mode, function (err, fd) {
+      if (err) {
+        if (that.autoClose)
+          that.destroy()
+
+        that.emit('error', err)
+      } else {
+        that.fd = fd
+        that.emit('open', fd)
+        that.read()
+      }
+    })
+  }
+
+  function WriteStream (path, options) {
+    if (this instanceof WriteStream)
+      return fs$WriteStream.apply(this, arguments), this
+    else
+      return WriteStream.apply(Object.create(WriteStream.prototype), arguments)
+  }
+
+  function WriteStream$open () {
+    var that = this
+    open(that.path, that.flags, that.mode, function (err, fd) {
+      if (err) {
+        that.destroy()
+        that.emit('error', err)
+      } else {
+        that.fd = fd
+        that.emit('open', fd)
+      }
+    })
+  }
+
+  function createReadStream (path, options) {
+    return new fs.ReadStream(path, options)
+  }
+
+  function createWriteStream (path, options) {
+    return new fs.WriteStream(path, options)
+  }
+
+  var fs$open = fs.open
+  fs.open = open
+  function open (path, flags, mode, cb) {
+    if (typeof mode === 'function')
+      cb = mode, mode = null
+
+    return go$open(path, flags, mode, cb)
+
+    function go$open (path, flags, mode, cb, startTime) {
+      return fs$open(path, flags, mode, function (err, fd) {
+        if (err && (err.code === 'EMFILE' || err.code === 'ENFILE'))
+          enqueue([go$open, [path, flags, mode, cb], err, startTime || Date.now(), Date.now()])
+        else {
+          if (typeof cb === 'function')
+            cb.apply(this, arguments)
+        }
+      })
+    }
+  }
+
+  return fs
+}
+
+function enqueue (elem) {
+  debug('ENQUEUE', elem[0].name, elem[1])
+  fs[gracefulQueue].push(elem)
+  retry()
+}
+
+// keep track of the timeout between retry() calls
+var retryTimer
+
+// reset the startTime and lastTime to now
+// this resets the start of the 60 second overall timeout as well as the
+// delay between attempts so that we'll retry these jobs sooner
+function resetQueue () {
+  var now = Date.now()
+  for (var i = 0; i < fs[gracefulQueue].length; ++i) {
+    // entries that are only a length of 2 are from an older version, don't
+    // bother modifying those since they'll be retried anyway.
+    if (fs[gracefulQueue][i].length > 2) {
+      fs[gracefulQueue][i][3] = now // startTime
+      fs[gracefulQueue][i][4] = now // lastTime
+    }
+  }
+  // call retry to make sure we're actively processing the queue
+  retry()
+}
+
+function retry () {
+  // clear the timer and remove it to help prevent unintended concurrency
+  clearTimeout(retryTimer)
+  retryTimer = undefined
+
+  if (fs[gracefulQueue].length === 0)
+    return
+
+  var elem = fs[gracefulQueue].shift()
+  var fn = elem[0]
+  var args = elem[1]
+  // these items may be unset if they were added by an older graceful-fs
+  var err = elem[2]
+  var startTime = elem[3]
+  var lastTime = elem[4]
+
+  // if we don't have a startTime we have no way of knowing if we've waited
+  // long enough, so go ahead and retry this item now
+  if (startTime === undefined) {
+    debug('RETRY', fn.name, args)
+    fn.apply(null, args)
+  } else if (Date.now() - startTime >= 60000) {
+    // it's been more than 60 seconds total, bail now
+    debug('TIMEOUT', fn.name, args)
+    var cb = args.pop()
+    if (typeof cb === 'function')
+      cb.call(null, err)
+  } else {
+    // the amount of time between the last attempt and right now
+    var sinceAttempt = Date.now() - lastTime
+    // the amount of time between when we first tried, and when we last tried
+    // rounded up to at least 1
+    var sinceStart = Math.max(lastTime - startTime, 1)
+    // backoff. wait longer than the total time we've been retrying, but only
+    // up to a maximum of 100ms
+    var desiredDelay = Math.min(sinceStart * 1.2, 100)
+    // it's been long enough since the last retry, do it again
+    if (sinceAttempt >= desiredDelay) {
+      debug('RETRY', fn.name, args)
+      fn.apply(null, args.concat([startTime]))
+    } else {
+      // if we can't do this job yet, push it to the end of the queue
+      // and let the next iteration check again
+      fs[gracefulQueue].push(elem)
+    }
+  }
+
+  // schedule our next run if one isn't already scheduled
+  if (retryTimer === undefined) {
+    retryTimer = setTimeout(retry, 0)
+  }
+}
+
+
+/***/ }),
+
+/***/ 3086:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var Stream = __nccwpck_require__(2413).Stream
+
+module.exports = legacy
+
+function legacy (fs) {
+  return {
+    ReadStream: ReadStream,
+    WriteStream: WriteStream
+  }
+
+  function ReadStream (path, options) {
+    if (!(this instanceof ReadStream)) return new ReadStream(path, options);
+
+    Stream.call(this);
+
+    var self = this;
+
+    this.path = path;
+    this.fd = null;
+    this.readable = true;
+    this.paused = false;
+
+    this.flags = 'r';
+    this.mode = 438; /*=0666*/
+    this.bufferSize = 64 * 1024;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.encoding) this.setEncoding(this.encoding);
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.end === undefined) {
+        this.end = Infinity;
+      } else if ('number' !== typeof this.end) {
+        throw TypeError('end must be a Number');
+      }
+
+      if (this.start > this.end) {
+        throw new Error('start must be <= end');
+      }
+
+      this.pos = this.start;
+    }
+
+    if (this.fd !== null) {
+      process.nextTick(function() {
+        self._read();
+      });
+      return;
+    }
+
+    fs.open(this.path, this.flags, this.mode, function (err, fd) {
+      if (err) {
+        self.emit('error', err);
+        self.readable = false;
+        return;
+      }
+
+      self.fd = fd;
+      self.emit('open', fd);
+      self._read();
+    })
+  }
+
+  function WriteStream (path, options) {
+    if (!(this instanceof WriteStream)) return new WriteStream(path, options);
+
+    Stream.call(this);
+
+    this.path = path;
+    this.fd = null;
+    this.writable = true;
+
+    this.flags = 'w';
+    this.encoding = 'binary';
+    this.mode = 438; /*=0666*/
+    this.bytesWritten = 0;
+
+    options = options || {};
+
+    // Mixin options into this
+    var keys = Object.keys(options);
+    for (var index = 0, length = keys.length; index < length; index++) {
+      var key = keys[index];
+      this[key] = options[key];
+    }
+
+    if (this.start !== undefined) {
+      if ('number' !== typeof this.start) {
+        throw TypeError('start must be a Number');
+      }
+      if (this.start < 0) {
+        throw new Error('start must be >= zero');
+      }
+
+      this.pos = this.start;
+    }
+
+    this.busy = false;
+    this._queue = [];
+
+    if (this.fd === null) {
+      this._open = fs.open;
+      this._queue.push([this._open, this.path, this.flags, this.mode, undefined]);
+      this.flush();
+    }
+  }
+}
+
+
+/***/ }),
+
+/***/ 263:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var constants = __nccwpck_require__(7619)
+
+var origCwd = process.cwd
+var cwd = null
+
+var platform = process.env.GRACEFUL_FS_PLATFORM || process.platform
+
+process.cwd = function() {
+  if (!cwd)
+    cwd = origCwd.call(process)
+  return cwd
+}
+try {
+  process.cwd()
+} catch (er) {}
+
+// This check is needed until node.js 12 is required
+if (typeof process.chdir === 'function') {
+  var chdir = process.chdir
+  process.chdir = function (d) {
+    cwd = null
+    chdir.call(process, d)
+  }
+  if (Object.setPrototypeOf) Object.setPrototypeOf(process.chdir, chdir)
+}
+
+module.exports = patch
+
+function patch (fs) {
+  // (re-)implement some things that are known busted or missing.
+
+  // lchmod, broken prior to 0.6.2
+  // back-port the fix here.
+  if (constants.hasOwnProperty('O_SYMLINK') &&
+      process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
+    patchLchmod(fs)
+  }
+
+  // lutimes implementation, or no-op
+  if (!fs.lutimes) {
+    patchLutimes(fs)
+  }
+
+  // https://github.com/isaacs/node-graceful-fs/issues/4
+  // Chown should not fail on einval or eperm if non-root.
+  // It should not fail on enosys ever, as this just indicates
+  // that a fs doesn't support the intended operation.
+
+  fs.chown = chownFix(fs.chown)
+  fs.fchown = chownFix(fs.fchown)
+  fs.lchown = chownFix(fs.lchown)
+
+  fs.chmod = chmodFix(fs.chmod)
+  fs.fchmod = chmodFix(fs.fchmod)
+  fs.lchmod = chmodFix(fs.lchmod)
+
+  fs.chownSync = chownFixSync(fs.chownSync)
+  fs.fchownSync = chownFixSync(fs.fchownSync)
+  fs.lchownSync = chownFixSync(fs.lchownSync)
+
+  fs.chmodSync = chmodFixSync(fs.chmodSync)
+  fs.fchmodSync = chmodFixSync(fs.fchmodSync)
+  fs.lchmodSync = chmodFixSync(fs.lchmodSync)
+
+  fs.stat = statFix(fs.stat)
+  fs.fstat = statFix(fs.fstat)
+  fs.lstat = statFix(fs.lstat)
+
+  fs.statSync = statFixSync(fs.statSync)
+  fs.fstatSync = statFixSync(fs.fstatSync)
+  fs.lstatSync = statFixSync(fs.lstatSync)
+
+  // if lchmod/lchown do not exist, then make them no-ops
+  if (fs.chmod && !fs.lchmod) {
+    fs.lchmod = function (path, mode, cb) {
+      if (cb) process.nextTick(cb)
+    }
+    fs.lchmodSync = function () {}
+  }
+  if (fs.chown && !fs.lchown) {
+    fs.lchown = function (path, uid, gid, cb) {
+      if (cb) process.nextTick(cb)
+    }
+    fs.lchownSync = function () {}
+  }
+
+  // on Windows, A/V software can lock the directory, causing this
+  // to fail with an EACCES or EPERM if the directory contains newly
+  // created files.  Try again on failure, for up to 60 seconds.
+
+  // Set the timeout this long because some Windows Anti-Virus, such as Parity
+  // bit9, may lock files for up to a minute, causing npm package install
+  // failures. Also, take care to yield the scheduler. Windows scheduling gives
+  // CPU to a busy looping process, which can cause the program causing the lock
+  // contention to be starved of CPU by node, so the contention doesn't resolve.
+  if (platform === "win32") {
+    fs.rename = typeof fs.rename !== 'function' ? fs.rename
+    : (function (fs$rename) {
+      function rename (from, to, cb) {
+        var start = Date.now()
+        var backoff = 0;
+        fs$rename(from, to, function CB (er) {
+          if (er
+              && (er.code === "EACCES" || er.code === "EPERM")
+              && Date.now() - start < 60000) {
+            setTimeout(function() {
+              fs.stat(to, function (stater, st) {
+                if (stater && stater.code === "ENOENT")
+                  fs$rename(from, to, CB);
+                else
+                  cb(er)
+              })
+            }, backoff)
+            if (backoff < 100)
+              backoff += 10;
+            return;
+          }
+          if (cb) cb(er)
+        })
+      }
+      if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename)
+      return rename
+    })(fs.rename)
+  }
+
+  // if read() returns EAGAIN, then just try it again.
+  fs.read = typeof fs.read !== 'function' ? fs.read
+  : (function (fs$read) {
+    function read (fd, buffer, offset, length, position, callback_) {
+      var callback
+      if (callback_ && typeof callback_ === 'function') {
+        var eagCounter = 0
+        callback = function (er, _, __) {
+          if (er && er.code === 'EAGAIN' && eagCounter < 10) {
+            eagCounter ++
+            return fs$read.call(fs, fd, buffer, offset, length, position, callback)
+          }
+          callback_.apply(this, arguments)
+        }
+      }
+      return fs$read.call(fs, fd, buffer, offset, length, position, callback)
+    }
+
+    // This ensures `util.promisify` works as it does for native `fs.read`.
+    if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read)
+    return read
+  })(fs.read)
+
+  fs.readSync = typeof fs.readSync !== 'function' ? fs.readSync
+  : (function (fs$readSync) { return function (fd, buffer, offset, length, position) {
+    var eagCounter = 0
+    while (true) {
+      try {
+        return fs$readSync.call(fs, fd, buffer, offset, length, position)
+      } catch (er) {
+        if (er.code === 'EAGAIN' && eagCounter < 10) {
+          eagCounter ++
+          continue
+        }
+        throw er
+      }
+    }
+  }})(fs.readSync)
+
+  function patchLchmod (fs) {
+    fs.lchmod = function (path, mode, callback) {
+      fs.open( path
+             , constants.O_WRONLY | constants.O_SYMLINK
+             , mode
+             , function (err, fd) {
+        if (err) {
+          if (callback) callback(err)
+          return
+        }
+        // prefer to return the chmod error, if one occurs,
+        // but still try to close, and report closing errors if they occur.
+        fs.fchmod(fd, mode, function (err) {
+          fs.close(fd, function(err2) {
+            if (callback) callback(err || err2)
+          })
+        })
+      })
+    }
+
+    fs.lchmodSync = function (path, mode) {
+      var fd = fs.openSync(path, constants.O_WRONLY | constants.O_SYMLINK, mode)
+
+      // prefer to return the chmod error, if one occurs,
+      // but still try to close, and report closing errors if they occur.
+      var threw = true
+      var ret
+      try {
+        ret = fs.fchmodSync(fd, mode)
+        threw = false
+      } finally {
+        if (threw) {
+          try {
+            fs.closeSync(fd)
+          } catch (er) {}
+        } else {
+          fs.closeSync(fd)
+        }
+      }
+      return ret
+    }
+  }
+
+  function patchLutimes (fs) {
+    if (constants.hasOwnProperty("O_SYMLINK") && fs.futimes) {
+      fs.lutimes = function (path, at, mt, cb) {
+        fs.open(path, constants.O_SYMLINK, function (er, fd) {
+          if (er) {
+            if (cb) cb(er)
+            return
+          }
+          fs.futimes(fd, at, mt, function (er) {
+            fs.close(fd, function (er2) {
+              if (cb) cb(er || er2)
+            })
+          })
+        })
+      }
+
+      fs.lutimesSync = function (path, at, mt) {
+        var fd = fs.openSync(path, constants.O_SYMLINK)
+        var ret
+        var threw = true
+        try {
+          ret = fs.futimesSync(fd, at, mt)
+          threw = false
+        } finally {
+          if (threw) {
+            try {
+              fs.closeSync(fd)
+            } catch (er) {}
+          } else {
+            fs.closeSync(fd)
+          }
+        }
+        return ret
+      }
+
+    } else if (fs.futimes) {
+      fs.lutimes = function (_a, _b, _c, cb) { if (cb) process.nextTick(cb) }
+      fs.lutimesSync = function () {}
+    }
+  }
+
+  function chmodFix (orig) {
+    if (!orig) return orig
+    return function (target, mode, cb) {
+      return orig.call(fs, target, mode, function (er) {
+        if (chownErOk(er)) er = null
+        if (cb) cb.apply(this, arguments)
+      })
+    }
+  }
+
+  function chmodFixSync (orig) {
+    if (!orig) return orig
+    return function (target, mode) {
+      try {
+        return orig.call(fs, target, mode)
+      } catch (er) {
+        if (!chownErOk(er)) throw er
+      }
+    }
+  }
+
+
+  function chownFix (orig) {
+    if (!orig) return orig
+    return function (target, uid, gid, cb) {
+      return orig.call(fs, target, uid, gid, function (er) {
+        if (chownErOk(er)) er = null
+        if (cb) cb.apply(this, arguments)
+      })
+    }
+  }
+
+  function chownFixSync (orig) {
+    if (!orig) return orig
+    return function (target, uid, gid) {
+      try {
+        return orig.call(fs, target, uid, gid)
+      } catch (er) {
+        if (!chownErOk(er)) throw er
+      }
+    }
+  }
+
+  function statFix (orig) {
+    if (!orig) return orig
+    // Older versions of Node erroneously returned signed integers for
+    // uid + gid.
+    return function (target, options, cb) {
+      if (typeof options === 'function') {
+        cb = options
+        options = null
+      }
+      function callback (er, stats) {
+        if (stats) {
+          if (stats.uid < 0) stats.uid += 0x100000000
+          if (stats.gid < 0) stats.gid += 0x100000000
+        }
+        if (cb) cb.apply(this, arguments)
+      }
+      return options ? orig.call(fs, target, options, callback)
+        : orig.call(fs, target, callback)
+    }
+  }
+
+  function statFixSync (orig) {
+    if (!orig) return orig
+    // Older versions of Node erroneously returned signed integers for
+    // uid + gid.
+    return function (target, options) {
+      var stats = options ? orig.call(fs, target, options)
+        : orig.call(fs, target)
+      if (stats) {
+        if (stats.uid < 0) stats.uid += 0x100000000
+        if (stats.gid < 0) stats.gid += 0x100000000
+      }
+      return stats;
+    }
+  }
+
+  // ENOSYS means that the fs doesn't support the op. Just ignore
+  // that, because it doesn't matter.
+  //
+  // if there's no getuid, or if getuid() is something other
+  // than 0, and the error is EINVAL or EPERM, then just ignore
+  // it.
+  //
+  // This specific case is a silent failure in cp, install, tar,
+  // and most other unix tools that manage permissions.
+  //
+  // When running as root, or if other types of errors are
+  // encountered, then it's strict.
+  function chownErOk (er) {
+    if (!er)
+      return true
+
+    if (er.code === "ENOSYS")
+      return true
+
+    var nonroot = !process.getuid || process.getuid() !== 0
+    if (nonroot) {
+      if (er.code === "EINVAL" || er.code === "EPERM")
+        return true
+    }
+
+    return false
+  }
+}
 
 
 /***/ }),
@@ -9352,7 +10330,7 @@ const cidAndRest = path => {
       toResolve: output.slice(1)
     };
   }
-  throw errCode__default['default'](new Error(`Unknown path type ${ path }`), 'ERR_BAD_PATH');
+  throw errCode__default["default"](new Error(`Unknown path type ${ path }`), 'ERR_BAD_PATH');
 };
 async function* walkPath(path, blockstore, options = {}) {
   let {cid, toResolve} = cidAndRest(path);
@@ -9362,7 +10340,7 @@ async function* walkPath(path, blockstore, options = {}) {
   while (true) {
     const result = await index(cid, name, entryPath, toResolve, startingDepth, blockstore, options);
     if (!result.entry && !result.next) {
-      throw errCode__default['default'](new Error(`Could not resolve ${ path }`), 'ERR_NOT_FOUND');
+      throw errCode__default["default"](new Error(`Could not resolve ${ path }`), 'ERR_NOT_FOUND');
     }
     if (result.entry) {
       yield result.entry;
@@ -9377,9 +10355,9 @@ async function* walkPath(path, blockstore, options = {}) {
   }
 }
 async function exporter(path, blockstore, options = {}) {
-  const result = await last__default['default'](walkPath(path, blockstore, options));
+  const result = await last__default["default"](walkPath(path, blockstore, options));
   if (!result) {
-    throw errCode__default['default'](new Error(`Could not resolve ${ path }`), 'ERR_NOT_FOUND');
+    throw errCode__default["default"](new Error(`Could not resolve ${ path }`), 'ERR_NOT_FOUND');
   }
   return result;
 }
@@ -9422,7 +10400,7 @@ exports.walkPath = walkPath;
 
 var cid = __nccwpck_require__(6447);
 var errCode = __nccwpck_require__(2997);
-var dagCbor = __nccwpck_require__(6477);
+var dagCbor = __nccwpck_require__(3795);
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
@@ -9435,14 +10413,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -9484,7 +10460,7 @@ const resolve = async (cid$1, name, path, toResolve, resolve, depth, blockstore,
       }
       subObject = subObject[prop];
     } else {
-      throw errCode__default['default'](new Error(`No property named ${ prop } found in cbor node ${ cid$1 }`), 'ERR_NO_PROP');
+      throw errCode__default["default"](new Error(`No property named ${ prop } found in cbor node ${ cid$1 }`), 'ERR_NO_PROP');
     }
   }
   return {
@@ -9530,14 +10506,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -9553,7 +10527,7 @@ const rawContent = node => {
 };
 const resolve = async (cid, name, path, toResolve, resolve, depth, blockstore, options) => {
   if (toResolve.length) {
-    throw errCode__default['default'](new Error(`No link named ${ path } found in raw node ${ cid }`), 'ERR_NOT_FOUND');
+    throw errCode__default["default"](new Error(`No link named ${ path } found in raw node ${ cid }`), 'ERR_NOT_FOUND');
   }
   const buf = await mh__namespace.decode(cid.multihash.bytes);
   return {
@@ -9583,7 +10557,7 @@ module.exports = resolve;
 
 var errCode = __nccwpck_require__(2997);
 var dagPb = __nccwpck_require__(8012);
-var dagCbor = __nccwpck_require__(6477);
+var dagCbor = __nccwpck_require__(3795);
 var raw = __nccwpck_require__(2048);
 var identity = __nccwpck_require__(2379);
 var index = __nccwpck_require__(9662);
@@ -9602,14 +10576,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -9627,7 +10599,7 @@ const resolvers = {
 function resolve(cid, name, path, toResolve, depth, blockstore, options) {
   const resolver = resolvers[cid.code];
   if (!resolver) {
-    throw errCode__default['default'](new Error(`No resolver for code ${ cid.code }`), 'ERR_NO_RESOLVER');
+    throw errCode__default["default"](new Error(`No resolver for code ${ cid.code }`), 'ERR_NO_RESOLVER');
   }
   return resolver(cid, name, path, toResolve, resolve, depth, blockstore, options);
 }
@@ -9660,7 +10632,7 @@ const rawContent = node => {
 };
 const resolve = async (cid, name, path, toResolve, resolve, depth, blockstore, options) => {
   if (toResolve.length) {
-    throw errCode__default['default'](new Error(`No link named ${ path } found in raw node ${ cid }`), 'ERR_NOT_FOUND');
+    throw errCode__default["default"](new Error(`No link named ${ path } found in raw node ${ cid }`), 'ERR_NOT_FOUND');
   }
   const block = await blockstore.get(cid, options);
   return {
@@ -9719,7 +10691,7 @@ var validateOffsetAndLength = __nccwpck_require__(4287);
 var ipfsUnixfs = __nccwpck_require__(4103);
 var errCode = __nccwpck_require__(2997);
 var dagPb = __nccwpck_require__(8012);
-var dagCbor = __nccwpck_require__(6477);
+var dagCbor = __nccwpck_require__(3795);
 var raw = __nccwpck_require__(2048);
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
@@ -9733,14 +10705,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -9759,13 +10729,13 @@ async function* emitBytes(blockstore, node, start, end, streamPosition = 0, opti
     return streamPosition;
   }
   if (node.Data == null) {
-    throw errCode__default['default'](new Error('no data in PBNode'), 'ERR_NOT_UNIXFS');
+    throw errCode__default["default"](new Error('no data in PBNode'), 'ERR_NOT_UNIXFS');
   }
   let file;
   try {
     file = ipfsUnixfs.UnixFS.unmarshal(node.Data);
   } catch (err) {
-    throw errCode__default['default'](err, 'ERR_NOT_UNIXFS');
+    throw errCode__default["default"](err, 'ERR_NOT_UNIXFS');
   }
   if (file.data && file.data.length) {
     const buf = extractDataFromBlock(file.data, streamPosition, start, end);
@@ -9901,12 +10871,12 @@ const unixFsResolver = async (cid, name, path, toResolve, resolve, depth, blocks
     name = cid.toString();
   }
   if (node.Data == null) {
-    throw errCode__default['default'](new Error('no data in PBNode'), 'ERR_NOT_UNIXFS');
+    throw errCode__default["default"](new Error('no data in PBNode'), 'ERR_NOT_UNIXFS');
   }
   try {
     unixfs = ipfsUnixfs.UnixFS.unmarshal(node.Data);
   } catch (err) {
-    throw errCode__default['default'](err, 'ERR_NOT_UNIXFS');
+    throw errCode__default["default"](err, 'ERR_NOT_UNIXFS');
   }
   if (!path) {
     path = name;
@@ -9919,7 +10889,7 @@ const unixFsResolver = async (cid, name, path, toResolve, resolve, depth, blocks
       linkCid = findLinkCid(node, toResolve[0]);
     }
     if (!linkCid) {
-      throw errCode__default['default'](new Error('file does not exist'), 'ERR_NOT_FOUND');
+      throw errCode__default["default"](new Error('file does not exist'), 'ERR_NOT_FOUND');
     }
     const nextName = toResolve.shift();
     const nextPath = `${ path }/${ nextName }`;
@@ -10083,16 +11053,16 @@ const validateOffsetAndLength = (size, offset, length) => {
     offset = 0;
   }
   if (offset < 0) {
-    throw errCode__default['default'](new Error('Offset must be greater than or equal to 0'), 'ERR_INVALID_PARAMS');
+    throw errCode__default["default"](new Error('Offset must be greater than or equal to 0'), 'ERR_INVALID_PARAMS');
   }
   if (offset > size) {
-    throw errCode__default['default'](new Error('Offset must be less than the file size'), 'ERR_INVALID_PARAMS');
+    throw errCode__default["default"](new Error('Offset must be less than the file size'), 'ERR_INVALID_PARAMS');
   }
   if (!length && length !== 0) {
     length = size - offset;
   }
   if (length < 0) {
-    throw errCode__default['default'](new Error('Length must be greater than or equal to 0'), 'ERR_INVALID_PARAMS');
+    throw errCode__default["default"](new Error('Length must be greater than or equal to 0'), 'ERR_INVALID_PARAMS');
   }
   if (offset + length > size) {
     length = size - offset;
@@ -10104,6 +11074,103 @@ const validateOffsetAndLength = (size, offset, length) => {
 };
 
 module.exports = validateOffsetAndLength;
+
+
+/***/ }),
+
+/***/ 3795:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+var cborg = __nccwpck_require__(8694);
+var cid = __nccwpck_require__(6447);
+
+function _interopNamespace(e) {
+  if (e && e.__esModule) return e;
+  var n = Object.create(null);
+  if (e) {
+    Object.keys(e).forEach(function (k) {
+      if (k !== 'default') {
+        var d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: function () { return e[k]; }
+        });
+      }
+    });
+  }
+  n["default"] = e;
+  return Object.freeze(n);
+}
+
+var cborg__namespace = /*#__PURE__*/_interopNamespace(cborg);
+
+const CID_CBOR_TAG = 42;
+function cidEncoder(obj) {
+  if (obj.asCID !== obj) {
+    return null;
+  }
+  const cid$1 = cid.CID.asCID(obj);
+  if (!cid$1) {
+    return null;
+  }
+  const bytes = new Uint8Array(cid$1.bytes.byteLength + 1);
+  bytes.set(cid$1.bytes, 1);
+  return [
+    new cborg__namespace.Token(cborg__namespace.Type.tag, CID_CBOR_TAG),
+    new cborg__namespace.Token(cborg__namespace.Type.bytes, bytes)
+  ];
+}
+function undefinedEncoder() {
+  throw new Error('`undefined` is not supported by the IPLD Data Model and cannot be encoded');
+}
+function numberEncoder(num) {
+  if (Number.isNaN(num)) {
+    throw new Error('`NaN` is not supported by the IPLD Data Model and cannot be encoded');
+  }
+  if (num === Infinity || num === -Infinity) {
+    throw new Error('`Infinity` and `-Infinity` is not supported by the IPLD Data Model and cannot be encoded');
+  }
+  return null;
+}
+const encodeOptions = {
+  float64: true,
+  typeEncoders: {
+    Object: cidEncoder,
+    undefined: undefinedEncoder,
+    number: numberEncoder
+  }
+};
+function cidDecoder(bytes) {
+  if (bytes[0] !== 0) {
+    throw new Error('Invalid CID for CBOR tag 42; expected leading 0x00');
+  }
+  return cid.CID.decode(bytes.subarray(1));
+}
+const decodeOptions = {
+  allowIndefinite: false,
+  coerceUndefinedToNull: true,
+  allowNaN: false,
+  allowInfinity: false,
+  allowBigInt: true,
+  strict: true,
+  useMaps: false,
+  tags: []
+};
+decodeOptions.tags[CID_CBOR_TAG] = cidDecoder;
+const name = 'dag-cbor';
+const code = 113;
+const encode = node => cborg__namespace.encode(node, encodeOptions);
+const decode = data => cborg__namespace.decode(data, decodeOptions);
+
+exports.code = code;
+exports.decode = decode;
+exports.encode = encode;
+exports.name = name;
 
 
 /***/ }),
@@ -10121,7 +11188,7 @@ function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'defau
 var BufferList__default = /*#__PURE__*/_interopDefaultLegacy(BufferList);
 
 async function* fixedSizeChunker(source, options) {
-  let bl = new BufferList__default['default']();
+  let bl = new BufferList__default["default"]();
   let currentLength = 0;
   let emitted = false;
   const maxChunkSize = options.maxChunkSize;
@@ -10132,10 +11199,10 @@ async function* fixedSizeChunker(source, options) {
       yield bl.slice(0, maxChunkSize);
       emitted = true;
       if (maxChunkSize === bl.length) {
-        bl = new BufferList__default['default']();
+        bl = new BufferList__default["default"]();
         currentLength = 0;
       } else {
-        const newBl = new BufferList__default['default']();
+        const newBl = new BufferList__default["default"]();
         newBl.append(bl.shallowSlice(maxChunkSize));
         bl = newBl;
         currentLength -= maxChunkSize;
@@ -10174,14 +11241,14 @@ async function* rabinChunker(source, options) {
     min = options.minChunkSize;
     max = options.maxChunkSize;
   } else if (!options.avgChunkSize) {
-    throw errCode__default['default'](new Error('please specify an average chunk size'), 'ERR_INVALID_AVG_CHUNK_SIZE');
+    throw errCode__default["default"](new Error('please specify an average chunk size'), 'ERR_INVALID_AVG_CHUNK_SIZE');
   } else {
     avg = options.avgChunkSize;
     min = avg / 3;
     max = avg + avg / 2;
   }
   if (min < 16) {
-    throw errCode__default['default'](new Error('rabin min must be greater than 16'), 'ERR_INVALID_MIN_CHUNK_SIZE');
+    throw errCode__default["default"](new Error('rabin min must be greater than 16'), 'ERR_INVALID_MIN_CHUNK_SIZE');
   }
   if (max < min) {
     max = min;
@@ -10202,7 +11269,7 @@ async function* rabinChunker(source, options) {
 }
 async function* rabin(source, options) {
   const r = await rabinWasm.create(options.bits, options.min, options.max, options.window);
-  const buffers = new BufferList__default['default']();
+  const buffers = new BufferList__default["default"]();
   for await (const chunk of source) {
     buffers.append(chunk);
     const sizes = r.fingerprint(chunk);
@@ -10272,7 +11339,7 @@ function balanced(source, reduce, options) {
 }
 async function reduceToParents(source, reduce, options) {
   const roots = [];
-  for await (const chunked of batch__default['default'](source, options.maxChildrenPerNode)) {
+  for await (const chunked of batch__default["default"](source, options.maxChildrenPerNode)) {
     roots.push(await reduce(chunked));
   }
   if (roots.length > 1) {
@@ -10306,14 +11373,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -10337,9 +11402,7 @@ async function* bufferImporter(file, block, options) {
       } else {
         unixfs = new ipfsUnixfs.UnixFS({
           type: options.leafType,
-          data: buffer,
-          mtime: file.mtime,
-          mode: file.mode
+          data: buffer
         });
         buffer = dagPb__namespace.encode({
           Data: unixfs.marshal(),
@@ -10373,7 +11436,7 @@ function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'defau
 var all__default = /*#__PURE__*/_interopDefaultLegacy(all);
 
 async function flat(source, reduce) {
-  return reduce(await all__default['default'](source));
+  return reduce(await all__default["default"](source));
 }
 
 module.exports = flat;
@@ -10409,14 +11472,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -10439,7 +11500,7 @@ async function* buildFileBatch(file, blockstore, options) {
   } else {
     bufferImporter$1 = bufferImporter;
   }
-  for await (const entry of parallelBatch__default['default'](bufferImporter$1(file, blockstore, options), options.blockWriteConcurrency)) {
+  for await (const entry of parallelBatch__default["default"](bufferImporter$1(file, blockstore, options), options.blockWriteConcurrency)) {
     count++;
     if (count === 0) {
       previous = entry;
@@ -10459,7 +11520,7 @@ const reduce = (file, blockstore, options) => {
   async function reducer(leaves) {
     if (leaves.length === 1 && leaves[0].single && options.reduceSingleLeafToSelf) {
       const leaf = leaves[0];
-      if (leaf.cid.code === rawCodec__namespace.code && (file.mtime !== undefined || file.mode !== undefined)) {
+      if (file.mtime !== undefined || file.mode !== undefined) {
         let buffer = await blockstore.get(leaf.cid);
         leaf.unixfs = new ipfsUnixfs.UnixFS({
           type: 'file',
@@ -10534,7 +11595,7 @@ const reduce = (file, blockstore, options) => {
 function fileBuilder(file, block, options) {
   const dagBuilder = dagBuilders[options.strategy];
   if (!dagBuilder) {
-    throw errCode__default['default'](new Error(`Unknown importer build strategy name: ${ options.strategy }`), 'ERR_BAD_STRATEGY');
+    throw errCode__default["default"](new Error(`Unknown importer build strategy name: ${ options.strategy }`), 'ERR_BAD_STRATEGY');
   }
   return dagBuilder(buildFileBatch(file, block, options), reduce(file, block, options), options);
 }
@@ -10561,7 +11622,7 @@ async function trickleStream(source, reduce, options) {
   let iteration = 0;
   let maxDepth = 1;
   let subTree = root;
-  for await (const layer of batch__default['default'](source, options.maxChildrenPerNode)) {
+  for await (const layer of batch__default["default"](source, options.maxChildrenPerNode)) {
     if (subTree.isFull()) {
       if (subTree !== root) {
         root.addChild(await subTree.reduce(reduce));
@@ -10700,9 +11761,9 @@ function contentAsAsyncIterable(content) {
       return content;
     }
   } catch {
-    throw errCode__default['default'](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
+    throw errCode__default["default"](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
   }
-  throw errCode__default['default'](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
+  throw errCode__default["default"](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
 }
 async function* dagBuilder(source, blockstore, options) {
   for await (const entry of source) {
@@ -10768,7 +11829,7 @@ var errCode__default = /*#__PURE__*/_interopDefaultLegacy(errCode);
 async function* validateChunks(source) {
   for await (const content of source) {
     if (content.length === undefined) {
-      throw errCode__default['default'](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
+      throw errCode__default["default"](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
     }
     if (typeof content === 'string' || content instanceof String) {
       yield fromString.fromString(content.toString());
@@ -10777,7 +11838,7 @@ async function* validateChunks(source) {
     } else if (content instanceof Uint8Array) {
       yield content;
     } else {
-      throw errCode__default['default'](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
+      throw errCode__default["default"](new Error('Content was invalid'), 'ERR_INVALID_CONTENT');
     }
   }
 }
@@ -11137,7 +12198,7 @@ async function* importer(source, blockstore, options$1 = {}) {
   } else {
     candidates = [source];
   }
-  for await (const entry of treeBuilder$1(parallelBatch__default['default'](dagBuilder(candidates, blockstore, opts), opts.fileImportConcurrency), blockstore, opts)) {
+  for await (const entry of treeBuilder$1(parallelBatch__default["default"](dagBuilder(candidates, blockstore, opts), opts.fileImportConcurrency), blockstore, opts)) {
     yield {
       cid: entry.cid,
       path: entry.path,
@@ -11199,7 +12260,7 @@ const defaultOptions = {
   hamtBucketBits: 8
 };
 var defaultOptions$1 = (options = {}) => {
-  const defaults = mergeOptions__default['default'].bind({ ignoreUndefined: true });
+  const defaults = mergeOptions__default["default"].bind({ ignoreUndefined: true });
   return defaults(defaultOptions, options);
 };
 
@@ -11317,14 +12378,12 @@ function _interopNamespace(e) {
         var d = Object.getOwnPropertyDescriptor(e, k);
         Object.defineProperty(n, k, d.get ? d : {
           enumerable: true,
-          get: function () {
-            return e[k];
-          }
+          get: function () { return e[k]; }
         });
       }
     });
   }
-  n['default'] = e;
+  n["default"] = e;
   return Object.freeze(n);
 }
 
@@ -11363,7 +12422,7 @@ module.exports = persist;
 
 
 const toPathComponents = (path = '') => {
-  return (path.trim().match(/([^\\^/]|\\\/)+/g) || []).filter(Boolean);
+  return (path.trim().match(/([^\\/]|\\\/)+/g) || []).filter(Boolean);
 };
 
 module.exports = toPathComponents;
@@ -16286,86 +17345,6 @@ module.exports.AbortError = AbortError;
 
 /***/ }),
 
-/***/ 1940:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-var qs = __nccwpck_require__(1191)
-  , url = __nccwpck_require__(8835)
-  , xtend = __nccwpck_require__(1208);
-
-const PARSE_LINK_HEADER_MAXLEN = parseInt(process.env.PARSE_LINK_HEADER_MAXLEN) || 2000;
-const PARSE_LINK_HEADER_THROW_ON_MAXLEN_EXCEEDED = process.env.PARSE_LINK_HEADER_THROW_ON_MAXLEN_EXCEEDED != null
-
-function hasRel(x) {
-  return x && x.rel;
-}
-
-function intoRels (acc, x) {
-  function splitRel (rel) {
-    acc[rel] = xtend(x, { rel: rel });
-  }
-
-  x.rel.split(/\s+/).forEach(splitRel);
-
-  return acc;
-}
-
-function createObjects (acc, p) {
-  // rel="next" => 1: rel 2: next
-  var m = p.match(/\s*(.+)\s*=\s*"?([^"]+)"?/)
-  if (m) acc[m[1]] = m[2];
-  return acc;
-}
-
-function parseLink(link) {
-  try {
-    var m         =  link.match(/<?([^>]*)>(.*)/)
-      , linkUrl   =  m[1]
-      , parts     =  m[2].split(';')
-      , parsedUrl =  url.parse(linkUrl)
-      , qry       =  qs.parse(parsedUrl.query);
-
-    parts.shift();
-
-    var info = parts
-      .reduce(createObjects, {});
-    
-    info = xtend(qry, info);
-    info.url = linkUrl;
-    return info;
-  } catch (e) {
-    return null;
-  }
-}
-
-function checkHeader(linkHeader){
-  if (!linkHeader) return false;
-
-  if (linkHeader.length > PARSE_LINK_HEADER_MAXLEN) {
-    if (PARSE_LINK_HEADER_THROW_ON_MAXLEN_EXCEEDED) {
-      throw new Error('Input string too long, it should be under ' + PARSE_LINK_HEADER_MAXLEN + ' characters.');
-    } else {
-        return false;
-      }
-  }
-  return true;
-}
-
-module.exports = function (linkHeader) {
-  if (!checkHeader(linkHeader)) return null;
-
-  return linkHeader.split(/,\s*</)
-   .map(parseLink)
-   .filter(hasRel)
-   .reduce(intoRels, {});
-};
-
-
-/***/ }),
-
 /***/ 6916:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -19925,6 +20904,79 @@ function valueOnly (elem) {
 
 }));
 
+
+/***/ }),
+
+/***/ 7855:
+/***/ ((module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function throttledQueue(maxRequestsPerInterval, interval, evenlySpaced) {
+    if (evenlySpaced === void 0) { evenlySpaced = false; }
+    /**
+     * If all requests should be evenly spaced, adjust to suit.
+     */
+    if (evenlySpaced) {
+        interval = interval / maxRequestsPerInterval;
+        maxRequestsPerInterval = 1;
+    }
+    var queue = [];
+    var lastIntervalStart = 0;
+    var numRequestsPerInterval = 0;
+    var timeout;
+    /**
+     * Gets called at a set interval to remove items from the queue.
+     * This is a self-adjusting timer, since the browser's setTimeout is highly inaccurate.
+     */
+    var dequeue = function () {
+        var intervalEnd = lastIntervalStart + interval;
+        var now = Date.now();
+        /**
+         * Adjust the timer if it was called too early.
+         */
+        if (now < intervalEnd) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            timeout !== undefined && clearTimeout(timeout);
+            timeout = setTimeout(dequeue, intervalEnd - now);
+            return;
+        }
+        lastIntervalStart = now;
+        numRequestsPerInterval = 0;
+        for (var _i = 0, _a = queue.splice(0, maxRequestsPerInterval); _i < _a.length; _i++) {
+            var callback = _a[_i];
+            numRequestsPerInterval++;
+            void callback();
+        }
+        if (queue.length) {
+            timeout = setTimeout(dequeue, interval);
+        }
+        else {
+            timeout = undefined;
+        }
+    };
+    return function (fn) { return new Promise(function (resolve, reject) {
+        var callback = function () { return Promise.resolve().then(fn).then(resolve).catch(reject); };
+        var now = Date.now();
+        if (timeout === undefined && (now - lastIntervalStart) > interval) {
+            lastIntervalStart = now;
+            numRequestsPerInterval = 0;
+        }
+        if (numRequestsPerInterval++ < maxRequestsPerInterval) {
+            void callback();
+        }
+        else {
+            queue.push(callback);
+            if (timeout === undefined) {
+                timeout = setTimeout(dequeue, lastIntervalStart + interval - now);
+            }
+        }
+    }); };
+}
+module.exports = throttledQueue;
+exports.default = throttledQueue;
+//# sourceMappingURL=throttledQueue.js.map
 
 /***/ }),
 
@@ -24821,32 +25873,6 @@ exports.TextDecoder =
 
 /***/ }),
 
-/***/ 1208:
-/***/ ((module) => {
-
-module.exports = extend
-
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-
-function extend() {
-    var target = {}
-
-    for (var i = 0; i < arguments.length; i++) {
-        var source = arguments[i]
-
-        for (var key in source) {
-            if (hasOwnProperty.call(source, key)) {
-                target[key] = source[key]
-            }
-        }
-    }
-
-    return target
-}
-
-
-/***/ }),
-
 /***/ 7649:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -24862,11 +25888,12 @@ async function addToWeb3 ({ endpoint, token, pathToAdd, name, wrapWithDirectory 
 }
 
 function pickName ({ repo, run, sha }) {
-  return `${repo.replace('/', '-')}-${run}-${sha.substring(0, 8)}`
+  return `${repo.replace('/', '-')}`
 }
 
 module.exports.addToWeb3 = addToWeb3
 module.exports.pickName = pickName
+
 
 /***/ }),
 
@@ -25194,63 +26221,6 @@ exports.Blob = Blob;
 
 /***/ }),
 
-/***/ 6697:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var builtin = __nccwpck_require__(4293);
-
-function _interopNamespace(e) {
-  if (e && e.__esModule) return e;
-  var n = Object.create(null);
-  if (e) {
-    Object.keys(e).forEach(function (k) {
-      if (k !== 'default') {
-        var d = Object.getOwnPropertyDescriptor(e, k);
-        Object.defineProperty(n, k, d.get ? d : {
-          enumerable: true,
-          get: function () {
-            return e[k];
-          }
-        });
-      }
-    });
-  }
-  n['default'] = e;
-  return Object.freeze(n);
-}
-
-var builtin__namespace = /*#__PURE__*/_interopNamespace(builtin);
-
-/**
- * @returns {typeof globalThis.Blob|null}
- */
-const use = () => {
-  try {
-    // @ts-ignore
-    const { Blob } = builtin__namespace;
-    const view = new Uint16Array(1);
-    // Checks if critical issue with node implementation of Blob is fixed
-    // @see https://github.com/nodejs/node/issues/40705
-    const isBugFixed = new Blob([view]).size === view.byteLength;
-    return isBugFixed ? Blob : null
-  } catch (error) {
-    return null
-  }
-};
-
-const Blob = use();
-
-exports.Blob = Blob;
-//# sourceMappingURL=blob.node.cjs.map
-
-
-/***/ }),
-
 /***/ 5343:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -25261,32 +26231,36 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 var webEncoding = __nccwpck_require__(1430);
 var stream = __nccwpck_require__(6995);
-var blob_node = __nccwpck_require__(6697);
 var blob = __nccwpck_require__(5576);
 
 /** @type {typeof globalThis.Blob} */
 // Our first choise is to use global `Blob` because it may be available e.g. in
 // electron renderrer process. If not available fall back to node native
 // implementation, if also not available use our implementation.
-const Blob = globalThis.Blob || blob_node.Blob || blob.Blob;
+const Blob =
+  globalThis.Blob || 
+  // Disable node native blob until impractical perf issue is fixed
+  // @see https://github.com/nodejs/node/issues/42108
+  // NodeBlob ||
+  blob.Blob;
 
 Object.defineProperty(exports, "TextDecoder", ({
-	enumerable: true,
-	get: function () {
-		return webEncoding.TextDecoder;
-	}
+  enumerable: true,
+  get: function () {
+    return webEncoding.TextDecoder;
+  }
 }));
 Object.defineProperty(exports, "TextEncoder", ({
-	enumerable: true,
-	get: function () {
-		return webEncoding.TextEncoder;
-	}
+  enumerable: true,
+  get: function () {
+    return webEncoding.TextEncoder;
+  }
 }));
 Object.defineProperty(exports, "ReadableStream", ({
-	enumerable: true,
-	get: function () {
-		return stream.ReadableStream;
-	}
+  enumerable: true,
+  get: function () {
+    return stream.ReadableStream;
+  }
 }));
 exports.Blob = Blob;
 //# sourceMappingURL=lib.node.cjs.map
@@ -27778,6 +28752,94 @@ try {
 
 /***/ }),
 
+/***/ 4799:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+const MAX_HEADER_LENGTH = 2000;
+const THROW_ON_MAX_HEADER_LENGTH_EXCEEDED = false;
+
+function hasRel (x) {
+  return x && x.rel
+}
+
+function intoRels (acc, x) {
+  function splitRel (rel) {
+    acc[rel] = Object.assign({}, x, { rel: rel });
+  }
+
+  x.rel.split(/\s+/).forEach(splitRel);
+
+  return acc
+}
+
+function createObjects (acc, p) {
+  // rel="next" => 1: rel 2: next
+  const m = p.match(/\s*(.+)\s*=\s*"?([^"]+)"?/);
+  if (m) acc[m[1]] = m[2];
+  return acc
+}
+
+function parseLink (link) {
+  try {
+    const m = link.match(/<?([^>]*)>(.*)/);
+    const linkUrl = m[1];
+    const parts = m[2].split(';');
+    const qry = {};
+    // The origin is unused but it's required to parse relative URLs
+    const url = new URL(linkUrl, 'https://example.com');
+
+    for (const [key, value] of url.searchParams) {
+      qry[key] = value;
+    }
+
+    parts.shift();
+
+    let info = parts.reduce(createObjects, {});
+    info = Object.assign({}, qry, info);
+    info.url = linkUrl;
+    return info
+  } catch {
+    return null
+  }
+}
+
+function checkHeader (linkHeader, options) {
+  if (!linkHeader) return false
+
+  options = options || {};
+  const maxHeaderLength = options.maxHeaderLength || MAX_HEADER_LENGTH;
+  const throwOnMaxHeaderLengthExceeded = options.throwOnMaxHeaderLengthExceeded || THROW_ON_MAX_HEADER_LENGTH_EXCEEDED;
+
+  if (linkHeader.length > maxHeaderLength) {
+    if (throwOnMaxHeaderLengthExceeded) {
+      throw new Error('Input string too long, it should be under ' + maxHeaderLength + ' characters.')
+    } else {
+      return false
+    }
+  }
+  return true
+}
+
+function parseLinkHeader (linkHeader, options) {
+  if (!checkHeader(linkHeader, options)) return null
+
+  return linkHeader.split(/,\s*</)
+    .map(parseLink)
+    .filter(hasRel)
+    .reduce(intoRels, {})
+}
+
+exports.parseLinkHeader = parseLinkHeader;
+//# sourceMappingURL=index.cjs.map
+
+
+/***/ }),
+
 /***/ 8100:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -27789,12 +28851,13 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 var streamingIterables = __nccwpck_require__(8205);
 var pRetry = __nccwpck_require__(2548);
 var pack = __nccwpck_require__(8163);
-var parseLink = __nccwpck_require__(1940);
+var parseLinkHeader = __nccwpck_require__(4799);
 var unpack = __nccwpck_require__(3428);
 var treewalk = __nccwpck_require__(6025);
 var car = __nccwpck_require__(2805);
 var filesFromPath = __nccwpck_require__(5090);
-var fetch = __nccwpck_require__(9681);
+var throttledQueue = __nccwpck_require__(7855);
+var _fetch = __nccwpck_require__(9681);
 var blob = __nccwpck_require__(5343);
 var file = __nccwpck_require__(7905);
 var fs = __nccwpck_require__(2689);
@@ -27802,8 +28865,8 @@ var fs = __nccwpck_require__(2689);
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
 var pRetry__default = /*#__PURE__*/_interopDefaultLegacy(pRetry);
-var parseLink__default = /*#__PURE__*/_interopDefaultLegacy(parseLink);
-var fetch__default = /*#__PURE__*/_interopDefaultLegacy(fetch);
+var throttledQueue__default = /*#__PURE__*/_interopDefaultLegacy(throttledQueue);
+var _fetch__default = /*#__PURE__*/_interopDefaultLegacy(_fetch);
 
 /**
  * A client library for the https://web3.storage/ service. It provides a convenient
@@ -27823,7 +28886,12 @@ var fetch__default = /*#__PURE__*/_interopDefaultLegacy(fetch);
 
 const MAX_PUT_RETRIES = 5;
 const MAX_CONCURRENT_UPLOADS = 3;
-const MAX_CHUNK_SIZE = 1024 * 1024 * 10; // chunk to ~10MB CARs
+const DEFAULT_CHUNK_SIZE = 1024 * 1024 * 10; // chunk to ~10MB CARs
+const MAX_BLOCK_SIZE = 1048576;
+const MAX_CHUNK_SIZE = 104857600;
+// These match what is enforced server-side
+const RATE_LIMIT_REQUESTS = 30;
+const RATE_LIMIT_PERIOD = 10 * 1000;
 
 /** @typedef { import('./lib/interface.js').API } API */
 /** @typedef { import('./lib/interface.js').Status} Status */
@@ -27832,10 +28900,31 @@ const MAX_CHUNK_SIZE = 1024 * 1024 * 10; // chunk to ~10MB CARs
 /** @typedef { import('./lib/interface.js').Web3File} Web3File */
 /** @typedef { import('./lib/interface.js').Filelike } Filelike */
 /** @typedef { import('./lib/interface.js').CIDString} CIDString */
+/** @typedef { import('./lib/interface.js').RequestOptions} RequestOptions */
 /** @typedef { import('./lib/interface.js').PutOptions} PutOptions */
 /** @typedef { import('./lib/interface.js').PutCarOptions} PutCarOptions */
+/** @typedef { import('./lib/interface.js').ListOptions} ListOptions */
+/** @typedef { import('./lib/interface.js').RateLimiter } RateLimiter */
 /** @typedef { import('./lib/interface.js').UnixFSEntry} UnixFSEntry */
 /** @typedef { import('./lib/interface.js').Web3Response} Web3Response */
+
+/**
+ * Creates a rate limiter which limits at the same rate as is enforced
+ * server-side, to allow the client to avoid exceeding the requests limit and
+ * being blocked for 30 seconds.
+ * @returns {RateLimiter}
+ */
+function createRateLimiter () {
+  const throttle = throttledQueue__default["default"](RATE_LIMIT_REQUESTS, RATE_LIMIT_PERIOD);
+  return () => throttle(() => {})
+}
+
+/**
+ * Rate limiter used by static API if no rate limiter is passed. Note that each
+ * instance of the Web3Storage class gets it's own limiter if none is passed.
+ * This is because rate limits are enforced per API token.
+ */
+const globalRateLimiter = createRateLimiter();
 
 /**
  * @implements Service
@@ -27851,9 +28940,14 @@ class Web3Storage {
    * const client = new Web3Storage({ token: API_TOKEN })
    * ```
    *
-   * @param {{token: string, endpoint?:URL}} options
+    @param {Service} options
    */
-  constructor ({ token, endpoint = new URL('https://api.web3.storage') }) {
+  constructor ({
+    token,
+    endpoint = new URL('https://api.web3.storage'),
+    rateLimiter,
+    fetch = _fetch__default["default"]
+  }) {
     /**
      * Authorization token.
      *
@@ -27865,6 +28959,15 @@ class Web3Storage {
      * @readonly
      */
     this.endpoint = endpoint;
+    /**
+     * @readonly
+     */
+    this.rateLimiter = rateLimiter || createRateLimiter();
+    /**
+     * Optional custom fetch function. Defaults to global fetch in browsers or @web-std/fetch on node.
+     * @readonly
+     */
+    this.fetch = fetch;
   }
 
   /**
@@ -27886,28 +28989,30 @@ class Web3Storage {
    * @param {PutOptions} [options]
    * @returns {Promise<CIDString>}
    */
-  static async put ({ endpoint, token }, files, {
+  static async put ({ endpoint, token, rateLimiter = globalRateLimiter, fetch = _fetch__default["default"] }, files, {
     onRootCidReady,
     onStoredChunk,
     maxRetries = MAX_PUT_RETRIES,
+    maxChunkSize = DEFAULT_CHUNK_SIZE,
     wrapWithDirectory = true,
-    name
+    name,
+    signal
   } = {}) {
+    if (maxChunkSize >= MAX_CHUNK_SIZE || maxChunkSize < MAX_BLOCK_SIZE) {
+      throw new Error('maximum chunk size must be less than 100MiB and greater than or equal to 1MB')
+    }
     const blockstore = new fs.FsBlockStore();
     try {
       const { out, root } = await pack.pack({
-        input: Array.from(files).map((f) => ({
-          path: f.name,
-          content: f.stream()
-        })),
+        input: Array.from(files).map(toImportCandidate),
         blockstore,
         wrapWithDirectory,
-        maxChunkSize: 1048576,
+        maxChunkSize: MAX_BLOCK_SIZE,
         maxChildrenPerNode: 1024
       });
       onRootCidReady && onRootCidReady(root.toString());
       const car$1 = await car.CarReader.fromIterable(out);
-      return await Web3Storage.putCar({ endpoint, token }, car$1, { onStoredChunk, maxRetries, name })
+      return await Web3Storage.putCar({ endpoint, token, rateLimiter, fetch }, car$1, { onStoredChunk, maxRetries, maxChunkSize, name, signal })
     } finally {
       await blockstore.close();
     }
@@ -27919,13 +29024,18 @@ class Web3Storage {
    * @param {PutCarOptions} [options]
    * @returns {Promise<CIDString>}
    */
-  static async putCar ({ endpoint, token }, car, {
+  static async putCar ({ endpoint, token, rateLimiter = globalRateLimiter, fetch = _fetch__default["default"] }, car, {
     name,
     onStoredChunk,
     maxRetries = MAX_PUT_RETRIES,
-    decoders
+    maxChunkSize = DEFAULT_CHUNK_SIZE,
+    decoders,
+    signal
   } = {}) {
-    const targetSize = MAX_CHUNK_SIZE;
+    if (maxChunkSize >= MAX_CHUNK_SIZE || maxChunkSize < MAX_BLOCK_SIZE) {
+      throw new Error('maximum chunk size must be less than 100MiB and greater than or equal to 1MB')
+    }
+    const targetSize = maxChunkSize;
     const url = new URL('car', endpoint);
     let headers = Web3Storage.headers(token);
 
@@ -27954,16 +29064,28 @@ class Web3Storage {
         carParts.push(part);
       }
 
-      const carFile = new blob.Blob(carParts, { type: 'application/car' });
+      const carFile = new blob.Blob(carParts, { type: 'application/vnd.ipld.car' });
       const res = await pRetry__default["default"](
         async () => {
-          const request = await fetch__default["default"](url.toString(), {
-            method: 'POST',
-            headers,
-            body: carFile
-          });
-          const res = await request.json();
-          if (!request.ok) {
+          await rateLimiter();
+          /** @type {Response} */
+          let response;
+          try {
+            response = await fetch(url.toString(), {
+              method: 'POST',
+              headers,
+              body: carFile,
+              signal
+            });
+          } catch (/** @type {any} */err) {
+            throw signal && signal.aborted ? new pRetry.AbortError(err) : err
+          }
+          /* c8 ignore next 3 */
+          if (response.status === 429) {
+            throw new Error('rate limited')
+          }
+          const res = await response.json();
+          if (!response.ok) {
             throw new Error(res.message)
           }
 
@@ -27987,39 +29109,54 @@ class Web3Storage {
   /**
    * @param {Service} service
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    * @returns {Promise<Web3Response | null>}
    */
-  static async get ({ endpoint, token }, cid) {
+  static async get ({ endpoint, token, rateLimiter = globalRateLimiter, fetch = _fetch__default["default"] }, cid, options = {}) {
     const url = new URL(`car/${cid}`, endpoint);
-    const res = await fetch__default["default"](url.toString(), {
+    await rateLimiter();
+    const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: Web3Storage.headers(token)
+      headers: Web3Storage.headers(token),
+      signal: options.signal
     });
+    /* c8 ignore next 3 */
+    if (res.status === 429) {
+      throw new Error('rate limited')
+    }
     return toWeb3Response(res)
   }
 
   /**
    * @param {Service} service
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    * @returns {Promise<CIDString>}
    */
   /* c8 ignore next 4 */
-  static async delete ({ endpoint, token }, cid) {
-    console.log('Not deleting', cid, endpoint, token);
+  static async delete ({ endpoint, token, rateLimiter = globalRateLimiter }, cid, options = {}) {
+    console.log('Not deleting', cid, endpoint, token, rateLimiter, options);
     throw Error('.delete not implemented yet')
   }
 
   /**
    * @param {Service} service
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    * @returns {Promise<Status | undefined>}
    */
-  static async status ({ endpoint, token }, cid) {
+  static async status ({ endpoint, token, rateLimiter = globalRateLimiter, fetch = _fetch__default["default"] }, cid, options = {}) {
     const url = new URL(`status/${cid}`, endpoint);
-    const res = await fetch__default["default"](url.toString(), {
+    await rateLimiter();
+    const res = await fetch(url.toString(), {
       method: 'GET',
-      headers: Web3Storage.headers(token)
+      headers: Web3Storage.headers(token),
+      signal: options.signal
     });
+    /* c8 ignore next 3 */
+    if (res.status === 429) {
+      throw new Error('rate limited')
+    }
     if (res.status === 404) {
       return undefined
     }
@@ -28031,32 +29168,37 @@ class Web3Storage {
 
   /**
    * @param {Service} service
-   * @param {object} [opts]
-   * @param {string} [opts.before] list items uploaded before this ISO 8601 date string
-   * @param {number} [opts.maxResults] maximum number of results to return
+   * @param {ListOptions} [opts]
    * @returns {AsyncIterable<Upload>}
    */
-  static async * list (service, { before = new Date().toISOString(), maxResults = Infinity } = {}) {
-  /**
-   * @param {Service} service
-   * @param {{before: string, size: number}} opts
-   * @returns {Promise<Response>}
-   */
-    function listPage ({ endpoint, token }, { before, size }) {
+  static async * list (service, { before = new Date().toISOString(), maxResults = Infinity, signal } = {}) {
+    /**
+     * @param {Service} service
+     * @param {{before: string, size: number}} opts
+     * @returns {Promise<Response>}
+     */
+    async function listPage ({ endpoint, token, rateLimiter = globalRateLimiter, fetch = _fetch__default["default"] }, { before, size }) {
       const search = new URLSearchParams({ before, size: size.toString() });
       const url = new URL(`user/uploads?${search}`, endpoint);
-      return fetch__default["default"](url.toString(), {
+      await rateLimiter();
+      return fetch(url.toString(), {
         method: 'GET',
         headers: {
           ...Web3Storage.headers(token),
           'Access-Control-Request-Headers': 'Link'
-        }
+        },
+        signal
       })
     }
     let count = 0;
     const size = maxResults > 100 ? 100 : maxResults;
     for await (const res of paginator(listPage, service, { before, size })) {
       if (!res.ok) {
+        /* c8 ignore next 3 */
+        if (res.status === 429) {
+          throw new Error('rate limited')
+        }
+
         /* c8 ignore next 2 */
         const errorMessage = await res.json();
         throw new Error(`${res.status} ${res.statusText} ${errorMessage ? '- ' + errorMessage.message : ''}`)
@@ -28140,25 +29282,28 @@ class Web3Storage {
   /**
    * Fetch the Content Addressed Archive by its root CID.
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    */
-  get (cid) {
-    return Web3Storage.get(this, cid)
+  get (cid, options) {
+    return Web3Storage.get(this, cid, options)
   }
 
   /**
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    */
   /* c8 ignore next 3 */
-  delete (cid) {
-    return Web3Storage.delete(this, cid)
+  delete (cid, options) {
+    return Web3Storage.delete(this, cid, options)
   }
 
   /**
    * Fetch info on Filecoin deals and IPFS pins that a given CID is replicated in.
    * @param {CIDString} cid
+   * @param {RequestOptions} [options]
    */
-  status (cid) {
-    return Web3Storage.status(this, cid)
+  status (cid, options) {
+    return Web3Storage.status(this, cid, options)
   }
 
   /**
@@ -28172,9 +29317,7 @@ class Web3Storage {
    * }
    * ```
    * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of
-   * @param {object} [opts]
-   * @param {string} [opts.before] list items uploaded before this ISO 8601 date string
-   * @param {number} [opts.maxResults] maximum number of results to return
+   * @param {ListOptions} [opts]
    * @returns {AsyncIterable<Upload>}
    */
   list (opts) {
@@ -28183,7 +29326,8 @@ class Web3Storage {
 }
 
 /**
- * Map a UnixFSEntry to a File with a cid property
+ * Map a UnixFSEntry to a File with a cid property.
+ *
  * @param {UnixFSEntry} entry
  * @returns {Promise<Web3File>}
  */
@@ -28253,6 +29397,25 @@ function toWeb3Response (res) {
 }
 
 /**
+ * Convert the passed file to an "import candidate" - an object suitable for
+ * passing to the ipfs-unixfs-importer. Note: content is an accessor so that
+ * the stream is only created when needed.
+ *
+ * @param {Filelike} file
+ */
+function toImportCandidate (file) {
+  /** @type {ReadableStream} */
+  let stream;
+  return {
+    path: file.name,
+    get content () {
+      stream = stream || file.stream();
+      return stream
+    }
+  }
+}
+
+/**
  * Follow Link headers on a Response, to fetch all the things.
  *
  * @param {(service: Service, opts: any) => Promise<Response>} fn
@@ -28262,13 +29425,13 @@ function toWeb3Response (res) {
 async function * paginator (fn, service, opts) {
   let res = await fn(service, opts);
   yield res;
-  let link = parseLink__default["default"](res.headers.get('Link') || '');
+  let link = parseLinkHeader.parseLinkHeader(res.headers.get('Link') || '');
   // @ts-ignore
   while (link && link.next) {
     // @ts-ignore
     res = await fn(service, link.next);
     yield res;
-    link = parseLink__default["default"](res.headers.get('Link') || '');
+    link = parseLinkHeader.parseLinkHeader(res.headers.get('Link') || '');
   }
 }
 
@@ -28289,6 +29452,7 @@ Object.defineProperty(exports, "File", ({
   get: function () { return file.File; }
 }));
 exports.Web3Storage = Web3Storage;
+exports.createRateLimiter = createRateLimiter;
 //# sourceMappingURL=lib.cjs.map
 
 
@@ -28307,6 +29471,14 @@ module.exports = require("assert");
 
 "use strict";
 module.exports = require("buffer");
+
+/***/ }),
+
+/***/ 7619:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("constants");
 
 /***/ }),
 
@@ -28371,14 +29543,6 @@ module.exports = require("os");
 
 "use strict";
 module.exports = require("path");
-
-/***/ }),
-
-/***/ 1191:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("querystring");
 
 /***/ }),
 
@@ -28470,7 +29634,7 @@ async function run () {
   try {
     const filename = core.getInput('file_name')
     const name = pickName({
-      repo: filename,
+      repo: encodeURIComponent(filename),
       run: process.env.GITHUB_RUN_NUMBER,
       sha: process.env.GITHUB_SHA
     })
