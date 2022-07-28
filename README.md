@@ -4,7 +4,7 @@
 <h1>演示视频: <br><a href="https://youtu.be/A7pImBMentI" targe="_blank">https://youtu.be/A7pImBMentI</a> <br><a href="https://youtu.be/fqHjkzwPw_o" targe="_blank">https://youtu.be/fqHjkzwPw_o</a>
 </h1>
 <p>已经完全采用mongodb数据库的方法来处理下载地址的获取，请忽略视频中的url修改。<br/>
-数据库中建立task表添加url和isnow字段.立即下载isnow="1",日常任务isnow="0"
+数据库中建立task表添加url和isnow字段.立即下载isnow=1,日常任务isnow=0
 </p>
 
 
