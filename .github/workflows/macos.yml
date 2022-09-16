@@ -54,13 +54,20 @@ jobs:
         path_to_add: "${{ steps.downloading.outputs.path }}" 
         file_name: "${{ steps.downloading.outputs.filename }}" 
         wrap_with_directory: true
+        
     - name: Save Data
       id:  database
       if: steps.downloading.outputs.filename != '' && !cancelled()  && !failure()
       run: |
         python save.py --con="${{ secrets.DB_CONNECT }}" --name="${{ steps.downloading.outputs.filename }}" --size="${{ steps.downloading.outputs.size }}" --cid="${{ steps.web3.outputs.cid }}"
         echo "::set-output name=status::ok"
-    
+        
+    - name: Download another task
+      uses: benc-uk/workflow-dispatch@v1
+      if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
+      with:
+        workflow: macos test
+        token: ${{ secrets.TOKEN }}
 
     - name: Notify upload info to mqtt broker
       if: steps.database.outputs.status != '' && !cancelled() && !failure()
