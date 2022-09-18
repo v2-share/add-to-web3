@@ -29,7 +29,6 @@ jobs:
         env: 
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         run: |
-          cd $GITHUB_WORKSPACE/add-to-web3
           git add 'dist'
           git commit -m "update dist $(TZ='Asia/Shanghai' date +@%Y%m%d)"
           git push --quiet "https://${{ secrets.TOKEN }}@github.com/ykxVK8yL5L/add-to-web3.git"
