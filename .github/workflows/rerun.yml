@@ -12,33 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-      
-    # Add other steps for your original workflow here
-    
     - name: Trigger Original Workflow
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const { GitHub, context } = require('@actions/github'); // 导入模块
-          const github = new GitHub(process.env.GITHUB_TOKEN); // 初始化 GitHub 对象
+      run: |
+        curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+        -H "Accept: application/vnd.github.everest-preview+json" \
+        -H "Content-Type: application/json" \
+        https://api.github.com/repos/${{ github.repository }}/actions/workflows/2Download%20right%20now/dispatches \
+        -d '{"ref": "${{ github.ref }}", "inputs": {"rerun_workflow": "true"}}'
 
-          const { data: workflow } = await github.actions.getWorkflowRun({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: ${{ github.run_id }}
-          });
-
-          const { data: dispatch } = await github.rest.repos.createDispatchEvent({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            event_type: "repository_dispatch",
-            client_payload: {
-              rerun_workflow: true
-            }
-          });
-          console.log(`Triggered original workflow: ${workflow.workflow.name}`);
-
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
