@@ -108,4 +108,4 @@ jobs:
           console.log(`Triggered original workflow: ${workflow.workflow.name}`);
 
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
