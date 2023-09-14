@@ -2,7 +2,7 @@ import certifi
 import pymongo
 import sys
 import argparse
-from bson.json_util import dumps, loads
+from bson.json_util import dumps loads
 import os
 import lk21
 
