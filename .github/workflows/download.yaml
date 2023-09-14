@@ -1,6 +1,8 @@
 name: 2Download right now
 
 on:
+schedule:
+    - cron: '*/30 * * * *' # This schedules the workflow to run every 30 minutes
   repository_dispatch:
   workflow_dispatch:
     inputs:
