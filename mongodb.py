@@ -2,7 +2,7 @@ import certifi
 import pymongo
 import sys
 import argparse
-from bson.json_util import dumps, 
+from bson.json_util import dumps
 
 parser = argparse.ArgumentParser(description='Insert data to mongdb.net')
 parser.add_argument("--con", help="Connection url", default="")
