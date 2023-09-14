@@ -38,6 +38,28 @@ jobs:
         python -m pip install --upgrade pip wheel
         pip install install lk21==1.5.61 pymongo pymongo[srv] pymongo[tls] certifi
 
+
+#     - name: Get Download Url
+#       id: geturl
+#       run: |
+#         url=$(python task.py  --con="${{ secrets.DB_CONNECT }}" --isnow=1)
+#         echo "::set-output name=fileurl::$url"
+      
+      
+#     - name: Downloading
+#       id: downloading
+#       if: steps.geturl.outputs.fileurl != 'None' && !cancelled()
+#       run: |
+#         url="${{ steps.geturl.outputs.fileurl }}"
+#         filename=${url##*##}
+#         download=${url%##*}
+#         downloadurl=$(python get_url.py --url="$download")
+#         echo "::set-output name=path::downloads/$filename"
+#         echo "::set-output name=filename::$filename"
+#         aria2c --conf $GITHUB_WORKSPACE/aria2.conf --seed-time=0 -d downloads -c $downloadurl -o $filename
+#         size=$(ls -l downloads/$filename | awk '{print $5}' )
+#         echo "::set-output name=size::$size"
+
     - name: Downloading
       id: downloading
       run: |
@@ -64,6 +86,7 @@ jobs:
         python mongodb.py --con="${{ secrets.DB_CONNECT }}" --name="${{ steps.downloading.outputs.filename }}" --size="${{ steps.downloading.outputs.size }}" --cid="${{ steps.web3.outputs.cid }}"
         echo "::set-output name=status::ok"
 
+
     - name: Notify upload info to mqtt broker
       if: steps.database.outputs.status != '' && !cancelled()
       uses: juhrlass/mqtt-action@master
@@ -80,32 +103,6 @@ jobs:
       uses: Mattraks/delete-workflow-runs@main
       with:
         token: ${{ github.token }}
-
-# This part triggers the workflow to run again after it has completed
-  rerun:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Trigger Original Workflow
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const { data: workflow } = await github.actions.getWorkflowRun({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: ${{ github.run_id }}
-          });
-
-          const { data: dispatch } = await github.rest.repos.createDispatchEvent({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            event_type: "repository_dispatch",
-            client_payload: {
-              rerun_workflow: true
-            }
-          });
-          console.log(`Triggered original workflow: ${workflow.workflow.name}`);
-
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 0
