@@ -90,7 +90,7 @@ jobs:
       uses: benc-uk/workflow-dispatch@v1
       if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
       with:
-          workflow: download.yaml
+          workflow: 2cixiazai.yaml
           ref: main
 
 
