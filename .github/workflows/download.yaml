@@ -93,7 +93,7 @@ jobs:
       with:
         script: |
           const { GitHub, context } = require('@actions/github');
-          const github = new GitHub(process.env.GITHUB_TOKEN);
+          const github = new GitHub(process.env.token);
 
           const { data: workflow } = await github.actions.getWorkflowRun({
             owner: context.repo.owner,
@@ -112,4 +112,4 @@ jobs:
           console.log(`Triggered original workflow: ${workflow.workflow.name}`);
 
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.TOKEN }}
