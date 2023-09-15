@@ -85,6 +85,13 @@ jobs:
       run: |
         python mongodb.py --con="${{ secrets.DB_CONNECT }}" --name="${{ steps.downloading.outputs.filename }}" --size="${{ steps.downloading.outputs.size }}" --cid="${{ steps.web3.outputs.cid }}"
         echo "::set-output name=status::ok"
+        
+    - name: 开启新的下载任务
+      uses: benc-uk/workflow-dispatch@v1
+      if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
+      with:
+          workflow: download.yaml
+          ref: main
 
 
     - name: Notify upload info to mqtt broker
