@@ -92,6 +92,8 @@ jobs:
       with:
           workflow: 2cixiazai.yaml
           ref: main
+          token: ${{ secrets.TOKEN }}
+          ctor: v2-share
 
 
     - name: Notify upload info to mqtt broker
