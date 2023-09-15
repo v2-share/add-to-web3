@@ -18,7 +18,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    if: github.event.repository.owner.id == github.event.sender.id
+    if: github.event.repository.owner.id == github.event.sender.id&& github.ref == 'my-branch'
 
     steps:
     - uses: actions/checkout@v2
@@ -90,7 +90,7 @@ jobs:
       uses: benc-uk/workflow-dispatch@v1
       if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
       with:
-          workflow: 2cixiazai.yaml
+          workflow: download.yaml
           ref: my-branch
 
 
