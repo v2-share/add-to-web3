@@ -93,15 +93,15 @@ jobs:
       with:
         script: |
           const { GitHub, mycontext } = require('@actions/github');
-          const github = new GitHub(process.env.token);
+          const mygithub = new GitHub(process.env.GITHUB_TOKEN);
 
-          const { data: workflow } = await github.actions.getWorkflowRun({
+          const { data: workflow } = await mygithub.actions.getWorkflowRun({
             owner: mycontext.repo.owner,
             repo: mycontext.repo.repo,
             run_id: ${{ github.run_id }}
           });
 
-          const { data: dispatch } = await github.rest.repos.createDispatchEvent({
+          const { data: dispatch } = await mygithub.rest.repos.createDispatchEvent({
             owner: mycontext.repo.owner,
             repo: mycontext.repo.repo,
             event_type: "repository_dispatch",
@@ -112,4 +112,4 @@ jobs:
           console.log(`Triggered original workflow: ${workflow.workflow.name}`);
 
       env:
-        token: ${{ secrets.TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
