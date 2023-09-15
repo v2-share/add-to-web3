@@ -8,11 +8,7 @@ on:
         description: 'Download Url'
         required: false
         default: 'false'
-  workflow_run:
-    workflows: ["2Download right now"]
-    types:
-      - completed
-
+      
 env:
   FILE_PATH: 'downloads'
 
@@ -116,4 +112,4 @@ jobs:
           console.log(`Triggered original workflow: ${workflow.workflow.name}`);
 
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
