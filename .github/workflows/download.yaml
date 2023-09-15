@@ -91,7 +91,7 @@ jobs:
       if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
       with:
           workflow: 2cixiazai.yaml
-          ref: main
+          ref: my-branch
 
 
     - name: Notify upload info to mqtt broker
