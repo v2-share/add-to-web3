@@ -1,18 +1,17 @@
-name: Download task
+name: 1Download task
 
 on:
   repository_dispatch:
-  schedule:
-    - cron: "30 * * * *"
+   schedule:
+      - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       Url:
         description: 'Download Url'
         required: false
         default: 'false'
-  watch:
-    types: started
-
+#   watch:
+#     types: started
 env:
   FILE_PATH: 'downloads'
   
@@ -23,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        persist-credentials: false
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
         fetch-depth: 0 
     - name: Aria2 Install
       run: sudo apt install -y aria2 
@@ -62,7 +61,7 @@ jobs:
       uses: benc-uk/workflow-dispatch@v1
       if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
       with:
-        workflow: Download task
+        workflow: 1Download task
         token: ${{ secrets.TOKEN }}
     - name: Notify upload info to mqtt broker
       if: steps.database.outputs.status != '' && !cancelled()
