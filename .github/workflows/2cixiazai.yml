@@ -1,4 +1,4 @@
-name: 2Download right now
+name: 2次下载
 
 on:
   repository_dispatch:
