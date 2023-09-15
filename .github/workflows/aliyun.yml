@@ -1,84 +1,115 @@
-name: PikPak转存Aliyun
+name: 2Download right now
+
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
-      Folder:
-        description: '保存目录'
-        required: true
-        default: 'PikPak'
-
+      Url:
+        description: 'Download Url'
+        required: false
+        default: 'false'
+#   watch:
+#     types: started
+env:
+  FILE_PATH: 'downloads'
+  
 jobs:
-  Aria2-Aliyun:
+
+  build:
+
     runs-on: ubuntu-latest
-    services:
-      aliyun:
-        image: messense/aliyundrive-webdav
-        env:
-          REFRESH_TOKEN: '${{ secrets.ALIYUN_REFRESH_TOKEN }}'
-          PORT: 8080
+    if: github.event.repository.owner.id == github.event.sender.id
+
     steps:
-      - uses: actions/checkout@v2
-        with:
-          persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
-          fetch-depth: 0 
-      - name: 增加可用空间 (删除dotnet, android、haskell、CodeQL)
-        shell: bash
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-      - name: 检查空间使用情况
-        run: |
-          echo "Free space:"
-          df -h
-      - name: 安装Aria2
-        run: sudo apt install -y aria2 
-      - name: 安装Python3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-      - name: 安装所需要的Python信赖
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install install requests
-      - name: 下载
-        id: downloading
-        run: |
-          mkdir downloads
-          python task.py --projet="${{ secrets.DETA_PROJECT_ID }}" --apikey="${{ secrets.DETA_API_KEY }}" --act="download"
-          filename=$(ls downloads | head -n1)
-          echo "::set-output name=path::downloads/$filename"
-          echo "::set-output name=filename::$filename"
-          echo "::set-output name=taskkey::$taskkey"
-          size=$(ls -l downloads/$filename | awk '{print $5}' )
-          echo "::set-output name=size::$size"
-          
-      - name: 上传到Aliyun
-        uses: thinkdolabs/curl@v1
-        if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
-        with:
-          args: --upload-file ${{ steps.downloading.outputs.path }}  http://aliyun:8080/${{ github.event.inputs.Folder}}/${{ steps.downloading.outputs.filename }}
-          
-      - name: 保存数据，删除远程已经下载列表
-        id:  database
-        if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
-        run: |
-          python task.py --projet="${{ secrets.DETA_PROJECT_ID }}" --apikey="${{ secrets.DETA_API_KEY }}" --taskkey="${{ steps.downloading.outputs.taskkey }}" --act="del"
-          echo "::set-output name=status::ok"
-          
-      - name: 开启新的下载任务
-        uses: benc-uk/workflow-dispatch@v1
-        if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
-        with:
-          workflow: aliyun.yml
-          ref: main
+    - uses: actions/checkout@v2
+      with:
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+        fetch-depth: 0 
+    - name: Aria2 Install
+      run: sudo apt install -y aria2
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
         
-      - name: 删除旧的上传记录
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 0
-          keep_minimum_runs: 0
+    - name: install prerequisites
+      run: |
+        python -m pip install --upgrade pip wheel
+        pip install install lk21==1.5.61 pymongo pymongo[srv] pymongo[tls] certifi
+
+
+#     - name: Get Download Url
+#       id: geturl
+#       run: |
+#         url=$(python task.py  --con="${{ secrets.DB_CONNECT }}" --isnow=1)
+#         echo "::set-output name=fileurl::$url"
+      
+      
+#     - name: Downloading
+#       id: downloading
+#       if: steps.geturl.outputs.fileurl != 'None' && !cancelled()
+#       run: |
+#         url="${{ steps.geturl.outputs.fileurl }}"
+#         filename=${url##*##}
+#         download=${url%##*}
+#         downloadurl=$(python get_url.py --url="$download")
+#         echo "::set-output name=path::downloads/$filename"
+#         echo "::set-output name=filename::$filename"
+#         aria2c --conf $GITHUB_WORKSPACE/aria2.conf --seed-time=0 -d downloads -c $downloadurl -o $filename
+#         size=$(ls -l downloads/$filename | awk '{print $5}' )
+#         echo "::set-output name=size::$size"
+
+    - name: Downloading
+      id: downloading
+      run: |
+        python download.py  --con="${{ secrets.DB_CONNECT }}" --isnow="1"
+        filename=$(ls downloads | head -n1)
+        echo "::set-output name=path::downloads/$filename"
+        echo "::set-output name=filename::$filename"
+        size=$(ls -l downloads/$filename | awk '{print $5}' )
+        echo "::set-output name=size::$size"
+
+    - uses: ykxVK8yL5L/add-to-web3@v1.5
+      id: web3
+      if: steps.downloading.outputs.filename != '' && !cancelled()
+      with:
+        web3_token: ${{ secrets.WEB3_STORAGE_TOKEN }}
+        path_to_add: "${{ steps.downloading.outputs.path }}"
+        file_name: "${{ steps.downloading.outputs.filename }}"
+        wrap_with_directory: true
+   
+    - name: Save Data
+      id:  database
+      if: steps.downloading.outputs.filename != '' && !cancelled()
+      run: |
+        python mongodb.py --con="${{ secrets.DB_CONNECT }}" --name="${{ steps.downloading.outputs.filename }}" --size="${{ steps.downloading.outputs.size }}" --cid="${{ steps.web3.outputs.cid }}"
+        echo "::set-output name=status::ok"
+        
+    - name: 开启新的下载任务
+      uses: benc-uk/workflow-dispatch@v1
+      if: steps.downloading.outputs.filename != '' && !cancelled() && !failure()
+      with:
+          workflow: download.yaml
+          ref: main
+
+
+    - name: Notify upload info to mqtt broker
+      if: steps.database.outputs.status != '' && !cancelled()
+      uses: juhrlass/mqtt-action@master
+      with:
+        protocol: mqtt
+        host: broker-cn.emqx.io
+        port: 1883
+        topic: ${{ secrets.SYNC_TOPIC }}
+        message: 'ok'
+        username: ''
+        password: ''
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 0
